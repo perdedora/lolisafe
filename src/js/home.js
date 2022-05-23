@@ -246,6 +246,8 @@ page.prepareUpload = () => {
     // Display dashboard link once logged in
     document.querySelector('#dashLink').classList.remove('is-hidden')
 
+    document.querySelector('#upAge').classList.remove('is-hidden')
+
     // Display the album selection
     document.querySelector('#albumDiv').classList.remove('is-hidden')
 
@@ -269,6 +271,15 @@ page.prepareUpload = () => {
   // Update elements wherever applicable
   document.querySelector('#maxSize > span').innerHTML = page.getPrettyBytes(page.maxSizeBytes)
   document.querySelector('#loginToUpload').classList.add('is-hidden')
+
+  let upDefault = page.getPrettyUploadAge(document.querySelector('#uploadAge').value)
+  if (upDefault === 'default hours') upDefault = page.getPrettyUploadAge(page.defaultTemporaryUploadAge)
+
+  if (upDefault === 'Permanent') {
+    document.querySelector('#upAge > span').innerHTML = 'permanently'
+  } else {
+    document.querySelector('#upAge > span').innerHTML = `for ${upDefault}`
+  }
 
   // Prepare & generate files upload tab
   page.prepareDropzone()
