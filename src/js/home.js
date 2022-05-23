@@ -243,6 +243,9 @@ page.prepareUpload = () => {
     const authLink = document.querySelector('#linksColumn a[href="auth"]')
     if (authLink) authLink.setAttribute('href', 'dashboard')
 
+    // Display dashboard link once logged in
+    document.querySelector('#dashLink').classList.remove('is-hidden')
+
     // Display the album selection
     document.querySelector('#albumDiv').classList.remove('is-hidden')
 

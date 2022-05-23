@@ -34,7 +34,7 @@
 <!-- Scripts -->
 {# We assign an ID for this so that the script can find out version string for render images #}
 <script id="renderScript" data-version="{{ versions[4] }}" src="js/misc/render.js{{ versions[1] }}" async></script>
-<script src="js/misc/newsfeed.js{{ versions[1] }}" async></script>
+{#<script src="js/misc/newsfeed.js{{ versions[1] }}" async></script>#}
 {# We assign an ID for this so that the script can find out its own version #}
 <script id="mainScript" src="js/home.js{{ versions[1] }}"></script>
 <script src="js/misc/utils.js{{ versions[1] }}"></script>
@@ -151,6 +151,9 @@
         </div>
         <div class="column is-hidden-mobile"></div>
       </div>
+      <div id="dashLink" class="is-hidden">
+      <a class="button is-info is-outlined is-wrappable" href="/dashboard">Dashboard</a>
+      </div>
 
       <div id="tpl" class="is-hidden">
         <div class="field">
@@ -178,7 +181,9 @@
         <a href="auth" id="loginLinkText"></a>
       </h3>
 
+	{% if home_links %}
       {% include "_partial/links.njk" %}
+	{% endif %}
 
       {% if gitHash -%}
       <div class="git-commit columns is-gapless">

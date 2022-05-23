@@ -80,7 +80,9 @@
       </div>
 
       {% set plain_links = true %}
+	{% if home_links %}
       {% include "_partial/links.njk" %}
+	{% endif %}
 
       {% if gitHash -%}
       <div class="git-commit columns is-gapless">
