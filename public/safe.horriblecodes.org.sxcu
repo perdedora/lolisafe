@@ -1,8 +1,8 @@
 {
-  "Name": "safe.fiery.me",
+  "Name": "safe.horriblecodes.org",
   "DestinationType": "ImageUploader, FileUploader",
   "RequestMethod": "POST",
-  "RequestURL": "https://safe.fiery.me/api/upload",
+  "RequestURL": "https://safe.horriblecodes.org/api/upload",
   "Headers": {
     "token": "",
     "albumid": "",
