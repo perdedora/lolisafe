@@ -48,7 +48,7 @@ self.verify = async (req, res, next) => {
       .where('username', username)
       .first()
 
-    if (!user) throw new ClientError('Username does not exist.')
+    if (!user) throw new ClientError('Wrong credentials.', { statusCode: 403 })
 
     if (user.enabled === false || user.enabled === 0) {
       throw new ClientError('This account has been disabled.', { statusCode: 403 })
@@ -56,7 +56,7 @@ self.verify = async (req, res, next) => {
 
     const result = await bcrypt.compare(password, user.password)
     if (result === false) {
-      throw new ClientError('Wrong password.', { statusCode: 403 })
+      throw new ClientError('Wrong credentials.', { statusCode: 403 })
     } else {
       await res.json({ success: true, token: user.token })
     }
