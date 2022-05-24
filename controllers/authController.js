@@ -21,7 +21,7 @@ const self = {
   pass: {
     min: 6,
     // Should not be more than 72 characters
-    // https://github.com/kelektiv/node.bcrypt.js#security-issues-and-concerns
+    // https://github.com/kelektiv/node.bcrypt.js/tree/v5.0.1#security-issues-and-concerns
     max: 64,
     // Length of randomized password
     // when resetting passwordthrough Dashboard's Manage Users.
@@ -29,7 +29,7 @@ const self = {
   }
 }
 
-// https://github.com/kelektiv/node.bcrypt.js#a-note-on-rounds
+// https://github.com/kelektiv/node.bcrypt.js/tree/v5.0.1#a-note-on-rounds
 const saltRounds = 10
 
 self.verify = async (req, res, next) => {

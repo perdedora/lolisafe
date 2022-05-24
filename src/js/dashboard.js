@@ -2924,7 +2924,7 @@ page.deleteUser = id => {
   })
 }
 
-// Roughly based on https://github.com/mayuska/pagination/blob/master/index.js
+// Roughly based on https://github.com/mayuska/pagination/blob/03cac0fb8af3a759bc1220bd3c011b67dbc5e909/index.js
 page.paginate = (totalItems, itemsPerPage, currentPage) => {
   currentPage = currentPage + 1
   const step = 3
