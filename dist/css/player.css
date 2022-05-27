@@ -1,2 +1,2 @@
-#inputForm,#playerContainer{margin-bottom:1.5rem}.video-js{margin:0 auto}
+#inputForm,#playerContainer{margin-bottom:1.5rem}.video-js{margin:0 auto}.video-js.vjs-wavesurfer.vjs-fluid wave.vjs-wavedisplay{height:calc(100% - 30px)!important}
 /*# sourceMappingURL=player.css.map */
