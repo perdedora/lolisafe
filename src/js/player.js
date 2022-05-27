@@ -128,6 +128,25 @@ page.reloadVideo = () => {
     })
     page.player.seekButtons({ forward: 10, back: 10 })
 
+    const videoJSButton = videojs.getComponent('Button')
+    const loopButtonText = () => page.player.loop()
+      ? 'Disable loop'
+      : 'Enable loop'
+    const loopButton = videojs.extend(videoJSButton, {
+      constructor () {
+        videoJSButton.apply(this, arguments)
+        this.addClass('vjs-loop-button')
+        this.controlText(loopButtonText())
+      },
+      handleClick () {
+        page.player.loop(!page.player.loop())
+        this.toggleClass('vjs-loop-enabled', page.player.loop())
+        this.controlText(loopButtonText())
+      }
+    })
+    videojs.registerComponent('loopButton', loopButton)
+    page.player.getChild('controlBar').addChild('loopButton')
+
     if (page.titleFormat) {
       document.title = page.titleFormat.replace(/%identifier%/g, page.urlIdentifier)
     }

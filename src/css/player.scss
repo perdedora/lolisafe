@@ -18,6 +18,7 @@
     }
   }
 
+  .vjs-loop-button,
   .vjs-seek-button {
     .vjs-icon-placeholder {
       /* stylelint-disable-next-line font-family-no-missing-generic-family-keyword */
@@ -30,6 +31,16 @@
         font-size: 1.5em;
         line-height: 1.97
       }
+    }
+  }
+
+  .vjs-loop-button {
+    &:not(.vjs-loop-enabled) {
+      color: $grey
+    }
+
+    .vjs-icon-placeholder::before {
+      content: "\e81f"
     }
   }
 
