@@ -114,7 +114,6 @@ page.reloadVideo = () => {
     if (isaudio) {
       options.plugins = {
         wavesurfer: {
-          backend: 'WebAudio',
           responsive: true
         }
       }
