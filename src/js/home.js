@@ -54,11 +54,6 @@ const page = {
   urlsQueue: [],
   activeUrlsQueue: 0,
 
-  // Include BMP for uploads preview only, cause the real images will be used
-  // Sharp isn't capable of making their thumbnails for dashboard and album public pages
-  imageExts: ['.gif', '.jpeg', '.jpg', '.png', '.svg', '.tif', '.tiff', '.webp', '.bmp'],
-  videoExts: ['.avi', '.m2ts', '.m4v', '.mkv', '.mov', '.mp4', '.webm', '.wmv'],
-
   albumTitleMaxLength: 70,
   albumDescMaxLength: 4000
 }
@@ -711,12 +706,16 @@ page.updateTemplate = (file, response) => {
   link.classList.remove('is-hidden')
   clipboard.parentElement.classList.remove('is-hidden')
 
-  const exec = /.[\w]+$/.exec(response.url)
-  const extname = exec && exec[0]
-    ? exec[0].toLowerCase()
-    : null
+  const isVideo = file.type.startsWith('video/')
+  const isAudio = file.type.startsWith('audio/')
+  if (isVideo || isAudio) {
+    const embedPlayer = file.previewElement.querySelector('.embedPlayer')
+    embedPlayer.querySelector('a').href = '/v' + a.pathname
+    embedPlayer.classList.remove('is-hidden')
+    embedPlayer.querySelector('i').className = isAudio ? 'icon-audio' : 'icon-video'
+  }
 
-  if (page.imageExts.includes(extname)) {
+  if (file.type.startsWith('image/')) {
     if (page.previewImages) {
       const img = file.previewElement.querySelector('img')
       img.setAttribute('alt', response.name || '')
@@ -732,8 +731,10 @@ page.updateTemplate = (file, response) => {
     } else {
       page.updateTemplateIcon(file.previewElement, 'icon-picture')
     }
-  } else if (page.videoExts.includes(extname)) {
+  } else if (isVideo) {
     page.updateTemplateIcon(file.previewElement, 'icon-video')
+  } else if (isAudio) {
+    page.updateTemplateIcon(file.previewElement, 'icon-audio')
   } else {
     page.updateTemplateIcon(file.previewElement, 'icon-doc-inv')
   }
