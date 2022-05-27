@@ -9,5 +9,12 @@
 }
 
 .video-js {
-  margin: 0 auto
+  margin: 0 auto;
+
+  &.vjs-wavesurfer.vjs-fluid {
+    /* stylelint-disable-next-line selector-type-no-unknown */
+    wave.vjs-wavedisplay {
+      height: calc(100% - 30px) !important
+    }
+  }
 }
