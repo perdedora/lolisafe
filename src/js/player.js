@@ -108,14 +108,13 @@ page.reloadVideo = () => {
     const options = {
       language: 'en',
       playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
-      responsive: true
+      responsive: true,
+      plugins: {}
     }
 
     if (isaudio) {
-      options.plugins = {
-        wavesurfer: {
-          responsive: true
-        }
+      options.plugins.wavesurfer = {
+        responsive: true
       }
     }
 

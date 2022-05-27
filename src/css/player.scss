@@ -17,4 +17,31 @@
       height: calc(100% - 30px) !important
     }
   }
+
+  .vjs-seek-button {
+    .vjs-icon-placeholder {
+      /* stylelint-disable-next-line font-family-no-missing-generic-family-keyword */
+      font-family: fontello;
+      font-weight: normal;
+      font-style: normal;
+      cursor: pointer;
+
+      &::before {
+        font-size: 1.5em;
+        line-height: 1.97
+      }
+    }
+  }
+
+  .vjs-seek-button {
+    &.skip-back .vjs-icon-placeholder::before {
+      content: "\e81e";
+      transform: none
+    }
+
+    &.skip-forward .vjs-icon-placeholder::before {
+      content: "\e818";
+      transform: none
+    }
+  }
 }
