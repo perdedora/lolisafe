@@ -86,10 +86,13 @@
 .icon-floppy::before { content: "\e815" } /* '' */
 .icon-user-plus::before { content: "\e816" } /* '' */
 .icon-privatebin::before { content: "\e817" } /* '' */
+.icon-fast-forward::before { content: "\e818" } /* '' */
 .icon-upload-cloud::before { content: "\e819" } /* '' */
 .icon-th-large::before { content: "\e81a" } /* '' */
 .icon-download::before { content: "\e81b" } /* '' */
 .icon-gatsby::before { content: "\e81c" } /* '' */
+.icon-fast-backward::before { content: "\e81e" } /* '' */
+.icon-cw::before { content: "\e81f" } /* '' */
 .icon-filter::before { content: "\f0b0" } /* '' */
 .icon-docs::before { content: "\f0c5" } /* '' */
 .icon-exchange::before { content: "\f0ec" } /* '' */
