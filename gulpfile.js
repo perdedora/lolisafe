@@ -14,6 +14,11 @@ const sassCompiler = require('sass')
 const sourcemaps = require('gulp-sourcemaps')
 const stylelint = require('@ronilaukkarinen/gulp-stylelint')
 const terser = require('gulp-terser')
+let sassEmbeddedCompiler
+try {
+  sassEmbeddedCompiler = require('sass-embedded')
+  console.log('Using "sass-embedded" package to compile sass\u2026')
+} catch (_) {}
 
 // Put built files for development on a Git-ignored directory.
 // This will prevent IDE's Git from unnecessarily
@@ -26,7 +31,7 @@ const postcssPlugins = [
   postcssPresetEnv()
 ]
 
-sass.compiler = sassCompiler
+sass.compiler = sassEmbeddedCompiler || sassCompiler
 
 // Minify on production
 if (process.env.NODE_ENV !== 'development') {
