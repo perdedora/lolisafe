@@ -99,7 +99,8 @@ page.reloadVideo = () => {
 
     const videoElement = document.createElement('video-js')
     videoElement.id = 'video-js'
-    videoElement.className = 'video-js vjs-default-skin vjs-fluid vjs-big-play-centered'
+    videoElement.className = 'video-js vjs-default-skin vjs-fluid '
+    videoElement.className += isaudio ? 'vjs-audio-only-mode' : 'vjs-big-play-centered vjs-16-9'
     videoElement.setAttribute('controls', true)
     videoElement.setAttribute('preload', 'auto')
 
