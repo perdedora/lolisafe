@@ -1082,12 +1082,12 @@ self.stats = async (req, res, next) => {
 }
 
 self.viewMetadata = async (req, res) => {
-  const src = paths.uploads + '/' + req.params.identifier
+  const src = `${paths.uploads}/${req.params.identifier}`
   try {
     const metadata = await mm.parseFile(src)
     return res.json({ success: true, common: metadata.common, format: metadata.format })
   } catch (error) {
-    return res.json({ sucess: false, error })
+    return res.json({ sucess: false })
   }
 }
 
