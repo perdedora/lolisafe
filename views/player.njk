@@ -30,8 +30,7 @@
 <script src="../libs/videojs-wavesurfer/videojs.wavesurfer.min.js{{ versions[3] }}"></script>
 <!-- Scripts -->
 {# We assign an ID for this so that the script can find out proper root URL of uploaded files #}
-<script id="mainScript" src="../js/player.js{{ versions[1] }}" data-upload-root="{{ uploadRoot }}" data-title-format="
-{{ titleFormat }}"></script>
+<script id="mainScript" src="../js/player.js{{ versions[1] }}" data-upload-root="{{ uploadRoot }}" data-title-format="{{ titleFormat }}"></script>
 <script src="../js/misc/utils.js{{ versions[1] }}"></script>
 {%- endif %}
 {% endblock %}
@@ -82,10 +81,16 @@
     </form>
 
     <div id="playerContainer"></div>
+    <div id="coverArt">
+    	<img></img>
+	<p></p>
+    </div>
+	<div id="id3Tags" class="table-container has-text-left"></div>
+
 
     <article class="message">
       <div class="message-body">
-        <p>This is an experimental embedded media player using <a href="https://github.com/videojs/video.js" target="_blank" rel="noopener">Video.js</a>.</p>
+        <p>This is an experimental embedded media player using <a href="https://github.com/videojs/video.js" target="_blank" rel="noopener">Video.js</a> and ID3 tags are provided with <a href="https://github.com/Borewit/music-metadata" target="_blank" rel="noopener">music-metadata</a>.</p>
         <p>This only allows you to play media uploads that you can play directly on your browser in the first place, and thus there is no additional support for other formats such as MKV.</p>
       </div>
     </article>

@@ -149,3 +149,15 @@ page.escape = string => {
     ? html + str.substring(lastIndex, index)
     : html
 }
+
+page.bitArray = (raw, key) => {
+  let base64String = ''
+  try {
+    for (let i = 0; i < raw[key].length; i++) {
+      base64String += String.fromCharCode(raw[key][i])
+    }
+  } catch (error) {
+    return false
+  }
+  return base64String
+}

@@ -15,6 +15,7 @@ const page = {
   titleFormat: null,
 
   videoContainer: document.querySelector('#playerContainer'),
+  id3Tags: document.querySelector('#id3Tags'),
   player: null
 }
 
@@ -70,6 +71,69 @@ page.toggleReloadBtn = enabled => {
   }
 }
 
+page.getMetadata = (file, sizeFile) => {
+  const fileSrc = `${window.origin}/v/${file}/tags`
+  axios.get(fileSrc).then(response => {
+    const metaData = response.data
+    if (metaData.success) {
+      const messageBox = document.querySelector('.message')
+      messageBox.classList.add('inplayer')
+      const tableMetaData = document.createElement('table')
+      const trackNo = metaData.common.track.no || 'N/A'
+      const album = metaData.common.album || 'N/A'
+      const artist = metaData.common.artist || 'N/A'
+      const trackTitle = metaData.common.title || 'N/A'
+      const year = metaData.common.year || 'N/A'
+      const codecProfile = metaData.format.codecProfile || 'N/A'
+      const sampleRate = `${Math.round(metaData.format.sampleRate / 100) / 10} hz` || 'N/A'
+      const bitRate = `${Math.round(metaData.format.bitrate / 1000)} kbps` || 'N/A'
+      const lossless = metaData.format.lossless ? 'Yes' : 'No'
+      const size = page.getPrettyBytes(parseInt(sizeFile))
+      const encoderSettings = metaData.common.encodersettings || 'N/A'
+      tableMetaData.className = 'table is-narrow is-fullwidth'
+      tableMetaData.innerHTML = `
+        <thead>
+        <tr>
+        <th>Artist</th>
+        <th>Album</th>
+        <th>Title</th>
+        <th>Track</th>
+        <th>Year</th>
+        <th>Codec Profile</th>
+        <th>Bitrate</th>
+        <th>Samplerate</th>
+        <th>Encoder</th>
+        <th>Lossless</th>
+        <th>Size</th>
+        </tr>
+        </thead>
+        <tbody id="table">
+        <tr>
+        <th>${artist}</th>
+        <th>${album}</th>
+        <th>${trackTitle}</th>
+        <th>${trackNo}</th>
+        <th>${year}</th>
+        <th>${codecProfile}</th>
+        <th>${bitRate}</th>
+        <th>${sampleRate}</th>
+        <th>${encoderSettings}</th>
+        <th>${lossless}</th>
+        <th>${size}</th>
+        </tr>
+        </tbody>`
+      const pictureSelect = metaData.common.picture ? metaData.common.picture[0] : 'N/A'
+      const coverArtBit = page.bitArray(pictureSelect.data, 'data')
+      const coverArtType = pictureSelect.format
+      const coverArt = document.querySelector('#coverArt')
+      coverArt.querySelector('img').src = pictureSelect === 'N/A' ? '../images/unavailable.png' : `data:${coverArtType};base64,${window.btoa(coverArtBit)}`
+      coverArt.querySelector('p').innerHTML = pictureSelect.type || ''
+
+      page.id3Tags.appendChild(tableMetaData)
+    }
+  })
+}
+
 page.reloadVideo = () => {
   if (!page.urlInput.value) return
 
@@ -91,6 +155,8 @@ page.reloadVideo = () => {
     }
 
     page.urlIdentifier = page.urlInput.value
+
+    if (isaudio) page.getMetadata(page.urlIdentifier, response.headers['content-length'])
 
     if (page.player) {
       page.player.dispose()
@@ -197,6 +263,8 @@ window.addEventListener('DOMContentLoaded', () => {
   if (page.reloadBtn) {
     page.reloadBtn.addEventListener('click', event => {
       if (!form.checkValidity()) return
+      const reloadTags = document.querySelector('#id3Tags > table')
+      if (reloadTags) reloadTags.remove()
       page.reloadVideo()
     })
   }

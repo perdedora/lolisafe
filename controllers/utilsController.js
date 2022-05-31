@@ -12,6 +12,7 @@ const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
 const config = require('./../config')
 const logger = require('./../logger')
+const mm = require('music-metadata')
 const db = require('knex')(config.database)
 
 const self = {
@@ -1077,6 +1078,16 @@ self.stats = async (req, res, next) => {
       statsData[key].generating = false
     })
     return apiErrorsHandler(error)
+  }
+}
+
+self.viewMetadata = async (req, res) => {
+  const src = paths.uploads + '/' + req.params.identifier
+  try {
+    const metadata = await mm.parseFile(src)
+    return res.json({ success: true, common: metadata.common, format: metadata.format })
+  } catch (error) {
+    return res.json({ sucess: false, error })
   }
 }
 
