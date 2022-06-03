@@ -4,8 +4,6 @@ const utils = require('./utilsController')
 const apiErrorsHandler = require('./handlers/apiErrorsHandler')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
-const config = require('./../config')
-const db = require('knex')(config.database)
 
 const self = {
   tokenLength: 64,
@@ -21,7 +19,7 @@ self.generateUniqueToken = async () => {
     // Put token on-hold (wait for it to be inserted to DB)
     self.onHold.add(token)
 
-    const user = await db.table('users')
+    const user = await utils.db.table('users')
       .where('token', token)
       .select('id')
       .first()
@@ -44,7 +42,7 @@ self.verify = async (req, res, next) => {
 
     if (!token) throw new ClientError('No token provided.', { statusCode: 403 })
 
-    const user = await db.table('users')
+    const user = await utils.db.table('users')
       .where('token', token)
       .select('username', 'permission')
       .first()
@@ -96,7 +94,7 @@ self.change = async (req, res, next) => {
       throw new ServerError('Failed to allocate a unique token. Try again?')
     }
 
-    await db.table('users')
+    await utils.db.table('users')
       .where('token', user.token)
       .update({
         token: newToken,

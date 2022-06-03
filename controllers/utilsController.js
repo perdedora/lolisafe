@@ -2,6 +2,7 @@ const { promisify } = require('util')
 const fetch = require('node-fetch')
 const ffmpeg = require('fluent-ffmpeg')
 const MarkdownIt = require('markdown-it')
+const knex = require('knex')
 const path = require('path')
 const sharp = require('sharp')
 const si = require('systeminformation')
@@ -13,9 +14,9 @@ const ServerError = require('./utils/ServerError')
 const config = require('./../config')
 const logger = require('./../logger')
 const mm = require('music-metadata')
-const db = require('knex')(config.database)
 
 const self = {
+  db: knex(config.database),
   scan: {
     instance: null,
     version: null,
@@ -297,7 +298,7 @@ self.assertUser = async (token, fields) => {
     _fields.push(...fields)
   }
 
-  const user = await db.table('users')
+  const user = await self.db.table('users')
     .where('token', token)
     .select(_fields)
     .first()
@@ -540,7 +541,7 @@ self.bulkDeleteFromDb = async (field, values, user) => {
     const albumids = []
 
     await Promise.all(chunks.map(async chunk => {
-      const files = await db.table('files')
+      const files = await self.db.table('files')
         .whereIn(field, chunk)
         .where(function () {
           if (!ismoderator) {
@@ -567,7 +568,7 @@ self.bulkDeleteFromDb = async (field, values, user) => {
       if (!unlinked.length) return
 
       // Delete all unlinked files from db
-      await db.table('files')
+      await self.db.table('files')
         .whereIn('id', unlinked.map(file => file.id))
         .del()
       self.invalidateStatsCache('uploads')
@@ -594,7 +595,7 @@ self.bulkDeleteFromDb = async (field, values, user) => {
     if (unlinkeds.length) {
       // Update albums if necessary, but do not wait
       if (albumids.length) {
-        db.table('albums')
+        self.db.table('albums')
           .whereIn('id', albumids)
           .update('editedAt', Math.floor(Date.now() / 1000))
           .catch(logger.error)
@@ -736,7 +737,7 @@ self.bulkDeleteExpired = async (dryrun, verbose) => {
   const sudo = { username: 'root' }
 
   const result = {}
-  result.expired = await db.table('files')
+  result.expired = await self.db.table('files')
     .where('expirydate', '<=', timestamp)
     .select(fields)
 
@@ -905,14 +906,14 @@ self.stats = async (req, res, next) => {
         }
 
         const getTotalCountAndSize = async () => {
-          const uploads = await db.table('files')
+          const uploads = await self.db.table('files')
             .select('size')
           stats[data.title].Total = uploads.length
           stats[data.title]['Size in DB'].value = uploads.reduce((acc, upload) => acc + parseInt(upload.size), 0)
         }
 
         const getImagesCount = async () => {
-          stats[data.title].Images = await db.table('files')
+          stats[data.title].Images = await self.db.table('files')
             .where(function () {
               for (const ext of self.imageExts) {
                 this.orWhere('name', 'like', `%${ext}`)
@@ -923,7 +924,7 @@ self.stats = async (req, res, next) => {
         }
 
         const getVideosCount = async () => {
-          stats[data.title].Videos = await db.table('files')
+          stats[data.title].Videos = await self.db.table('files')
             .where(function () {
               for (const ext of self.videoExts) {
                 this.orWhere('name', 'like', `%${ext}`)
@@ -934,7 +935,7 @@ self.stats = async (req, res, next) => {
         }
 
         const getAudiosCount = async () => {
-          stats[data.title].Audios = await db.table('files')
+          stats[data.title].Audios = await self.db.table('files')
             .where(function () {
               for (const ext of self.audioExts) {
                 this.orWhere('name', 'like', `%${ext}`)
@@ -945,7 +946,7 @@ self.stats = async (req, res, next) => {
         }
 
         const getOthersCount = async () => {
-          stats[data.title].Temporary = await db.table('files')
+          stats[data.title].Temporary = await self.db.table('files')
             .whereNotNull('expirydate')
             .count('id as count')
             .then(rows => rows[0].count)
@@ -992,7 +993,7 @@ self.stats = async (req, res, next) => {
           stats[data.title][p] = 0
         })
 
-        const users = await db.table('users')
+        const users = await self.db.table('users')
         stats[data.title].Total = users.length
         for (const user of users) {
           if (user.enabled === false || user.enabled === 0) {
@@ -1034,7 +1035,7 @@ self.stats = async (req, res, next) => {
           'ZIP Generated': 0
         }
 
-        const albums = await db.table('albums')
+        const albums = await self.db.table('albums')
         stats[data.title].Total = albums.length
 
         const activeAlbums = []
@@ -1052,7 +1053,7 @@ self.stats = async (req, res, next) => {
           stats[data.title]['ZIP Generated'] = files.length
         }).catch(() => {})
 
-        stats[data.title]['Files in albums'] = await db.table('files')
+        stats[data.title]['Files in albums'] = await self.db.table('files')
           .whereIn('albumid', activeAlbums)
           .count('id as count')
           .then(rows => rows[0].count)

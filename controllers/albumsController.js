@@ -12,7 +12,6 @@ const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
 const config = require('./../config')
 const logger = require('./../logger')
-const db = require('knex')(config.database)
 
 const self = {
   // Don't forget to update max length of text inputs in
@@ -56,7 +55,7 @@ self.getUniqueRandomName = async () => {
     // Put token on-hold (wait for it to be inserted to DB)
     self.onHold.add(identifier)
 
-    const album = await db.table('albums')
+    const album = await utils.db.table('albums')
       .where('identifier', identifier)
       .select('id')
       .first()
@@ -91,7 +90,7 @@ self.list = async (req, res, next) => {
     }
 
     // Query albums count for pagination
-    const count = await db.table('albums')
+    const count = await utils.db.table('albums')
       .where(filter)
       .count('id as count')
       .then(rows => rows[0].count)
@@ -101,7 +100,7 @@ self.list = async (req, res, next) => {
 
     let albums
     if (simple) {
-      albums = await db.table('albums')
+      albums = await utils.db.table('albums')
         .where(filter)
         .select(fields)
 
@@ -114,7 +113,7 @@ self.list = async (req, res, next) => {
       fields.push('identifier', 'enabled', 'timestamp', 'editedAt', 'zipGeneratedAt', 'download', 'public', 'description')
       if (all) fields.push('userid')
 
-      albums = await db.table('albums')
+      albums = await utils.db.table('albums')
         .where(filter)
         .limit(25)
         .offset(25 * offset)
@@ -149,7 +148,7 @@ self.list = async (req, res, next) => {
 
     await Promise.all(albums.map(album => getAlbumZipSize(album)))
 
-    const uploads = await db.table('files')
+    const uploads = await utils.db.table('files')
       .whereIn('albumid', Object.keys(albumids))
       .select('albumid', 'size')
 
@@ -174,7 +173,7 @@ self.list = async (req, res, next) => {
     if (!userids.length) return res.json({ success: true, albums, count, homeDomain })
 
     // Query usernames of user IDs from currently selected files
-    const usersTable = await db.table('users')
+    const usersTable = await utils.db.table('users')
       .whereIn('id', userids)
       .select('id', 'username')
 
@@ -199,7 +198,7 @@ self.create = async (req, res, next) => {
 
     if (!name) throw new ClientError('No album name specified.')
 
-    const album = await db.table('albums')
+    const album = await utils.db.table('albums')
       .where({
         name,
         enabled: 1,
@@ -211,7 +210,7 @@ self.create = async (req, res, next) => {
 
     const identifier = await self.getUniqueRandomName()
 
-    const ids = await db.table('albums').insert({
+    const ids = await utils.db.table('albums').insert({
       name,
       enabled: 1,
       userid: user.id,
@@ -263,7 +262,7 @@ self.disable = async (req, res, next) => {
       }
     }
 
-    const album = await db.table('albums')
+    const album = await utils.db.table('albums')
       .where(filter)
       .first()
 
@@ -272,7 +271,7 @@ self.disable = async (req, res, next) => {
     }
 
     if (purge) {
-      const files = await db.table('files')
+      const files = await utils.db.table('files')
         .where({
           albumid: id,
           userid: album.userid
@@ -287,12 +286,12 @@ self.disable = async (req, res, next) => {
     }
 
     if (del) {
-      await db.table('albums')
+      await utils.db.table('albums')
         .where(filter)
         .first()
         .del()
     } else {
-      await db.table('albums')
+      await utils.db.table('albums')
         .where(filter)
         .first()
         .update('enabled', 0)
@@ -338,7 +337,7 @@ self.edit = async (req, res, next) => {
       }
     }
 
-    const album = await db.table('albums')
+    const album = await utils.db.table('albums')
       .where(filter)
       .first()
 
@@ -350,7 +349,7 @@ self.edit = async (req, res, next) => {
       ? Boolean(req.body.enabled)
       : null
 
-    const nameInUse = await db.table('albums')
+    const nameInUse = await utils.db.table('albums')
       .where({
         name,
         enabled: 1,
@@ -385,7 +384,7 @@ self.edit = async (req, res, next) => {
       update.identifier = await self.getUniqueRandomName()
     }
 
-    await db.table('albums')
+    await utils.db.table('albums')
       .where(filter)
       .update(update)
     utils.invalidateAlbumsCache([id])
@@ -429,7 +428,7 @@ self.get = async (req, res, next) => {
       throw new ClientError('No identifier provided.')
     }
 
-    const album = await db.table('albums')
+    const album = await utils.db.table('albums')
       .where({
         identifier,
         enabled: 1
@@ -441,7 +440,7 @@ self.get = async (req, res, next) => {
     }
 
     const title = album.name
-    const files = await db.table('files')
+    const files = await utils.db.table('files')
       .select('name')
       .where('albumid', album.id)
       .orderBy('id', 'desc')
@@ -486,7 +485,7 @@ self.generateZip = async (req, res, next) => {
       throw new ClientError('ZIP generation disabled.', { statusCode: 403 })
     }
 
-    const album = await db.table('albums')
+    const album = await utils.db.table('albums')
       .where({
         identifier,
         enabled: 1
@@ -530,7 +529,7 @@ self.generateZip = async (req, res, next) => {
 
     logger.log(`Starting zip task for album: ${identifier}.`)
 
-    const files = await db.table('files')
+    const files = await utils.db.table('files')
       .select('name', 'size')
       .where('albumid', album.id)
     if (files.length === 0) {
@@ -574,7 +573,7 @@ self.generateZip = async (req, res, next) => {
 
     logger.log(`Finished zip task for album: ${identifier} (success).`)
 
-    await db.table('albums')
+    await utils.db.table('albums')
       .where('id', album.id)
       .update('zipGeneratedAt', Math.floor(Date.now() / 1000))
     utils.invalidateStatsCache('albums')
@@ -641,7 +640,7 @@ self.addFiles = async (req, res, next) => {
     failed = []
     albumids = []
     if (albumid !== null) {
-      const album = await db.table('albums')
+      const album = await utils.db.table('albums')
         .where('id', albumid)
         .where(function () {
           if (user.username !== 'root') {
@@ -657,13 +656,13 @@ self.addFiles = async (req, res, next) => {
       albumids.push(albumid)
     }
 
-    const files = await db.table('files')
+    const files = await utils.db.table('files')
       .whereIn('id', ids)
       .where('userid', user.id)
 
     failed = ids.filter(id => !files.find(file => file.id === id))
 
-    await db.table('files')
+    await utils.db.table('files')
       .whereIn('id', files.map(file => file.id))
       .update('albumid', albumid)
     utils.invalidateStatsCache('albums')
@@ -674,7 +673,7 @@ self.addFiles = async (req, res, next) => {
       }
     })
 
-    await db.table('albums')
+    await utils.db.table('albums')
       .whereIn('id', albumids)
       .update('editedAt', Math.floor(Date.now() / 1000))
     utils.invalidateAlbumsCache(albumids)

@@ -3,7 +3,6 @@ const path = require('path')
 const paths = require('./../controllers/pathsController')
 const utils = require('./../controllers/utilsController')
 const config = require('./../config')
-const db = require('knex')(config.database)
 
 routes.get('/a/:identifier', async (req, res, next) => {
   const identifier = req.params.identifier
@@ -11,7 +10,7 @@ routes.get('/a/:identifier', async (req, res, next) => {
     res.status(404).sendFile(path.join(paths.errorRoot, config.errorPages[404]))
   }
 
-  const album = await db.table('albums')
+  const album = await utils.db.table('albums')
     .where({
       identifier,
       enabled: 1
@@ -51,7 +50,7 @@ routes.get('/a/:identifier', async (req, res, next) => {
     utils.albumsCache[cacheid].generating = true
   }
 
-  const files = await db.table('files')
+  const files = await utils.db.table('files')
     .select('name', 'size')
     .where('albumid', album.id)
     .orderBy('id', 'desc')

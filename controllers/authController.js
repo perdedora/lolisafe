@@ -9,7 +9,6 @@ const apiErrorsHandler = require('./handlers/apiErrorsHandler.js')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
 const config = require('./../config')
-const db = require('knex')(config.database)
 
 // Don't forget to update min/max length of text inputs in auth.njk
 // when changing these values.
@@ -44,7 +43,7 @@ self.verify = async (req, res, next) => {
       : ''
     if (!password) throw new ClientError('No password provided.')
 
-    const user = await db.table('users')
+    const user = await utils.db.table('users')
       .where('username', username)
       .first()
 
@@ -85,7 +84,7 @@ self.register = async (req, res, next) => {
       throw new ClientError(`Password must have ${self.pass.min}-${self.pass.max} characters.`)
     }
 
-    const user = await db.table('users')
+    const user = await utils.db.table('users')
       .where('username', username)
       .first()
 
@@ -98,7 +97,7 @@ self.register = async (req, res, next) => {
       throw new ServerError('Failed to allocate a unique token. Try again?')
     }
 
-    await db.table('users')
+    await utils.db.table('users')
       .insert({
         username,
         password: hash,
@@ -129,7 +128,7 @@ self.changePassword = async (req, res, next) => {
 
     const hash = await bcrypt.hash(password, saltRounds)
 
-    await db.table('users')
+    await utils.db.table('users')
       .where('id', user.id)
       .update('password', hash)
 
@@ -184,7 +183,7 @@ self.createUser = async (req, res, next) => {
       }
     }
 
-    const exists = await db.table('users')
+    const exists = await utils.db.table('users')
       .where('username', username)
       .first()
 
@@ -197,7 +196,7 @@ self.createUser = async (req, res, next) => {
       throw new ServerError('Failed to allocate a unique token. Try again?')
     }
 
-    await db.table('users')
+    await utils.db.table('users')
       .insert({
         username,
         password: hash,
@@ -225,7 +224,7 @@ self.editUser = async (req, res, next) => {
     const id = parseInt(req.body.id)
     if (isNaN(id)) throw new ClientError('No user specified.')
 
-    const target = await db.table('users')
+    const target = await utils.db.table('users')
       .where('id', id)
       .first()
     self.assertPermission(user, target)
@@ -256,7 +255,7 @@ self.editUser = async (req, res, next) => {
       update.password = await bcrypt.hash(password, saltRounds)
     }
 
-    await db.table('users')
+    await utils.db.table('users')
       .where('id', id)
       .update(update)
     utils.invalidateStatsCache('users')
@@ -285,12 +284,12 @@ self.deleteUser = async (req, res, next) => {
     const purge = req.body.purge
     if (isNaN(id)) throw new ClientError('No user specified.')
 
-    const target = await db.table('users')
+    const target = await utils.db.table('users')
       .where('id', id)
       .first()
     self.assertPermission(user, target)
 
-    const files = await db.table('files')
+    const files = await utils.db.table('files')
       .where('userid', id)
       .select('id')
 
@@ -302,20 +301,20 @@ self.deleteUser = async (req, res, next) => {
         utils.invalidateStatsCache('uploads')
       } else {
         // Clear out userid attribute from the files
-        await db.table('files')
+        await utils.db.table('files')
           .whereIn('id', fileids)
           .update('userid', null)
       }
     }
 
-    const albums = await db.table('albums')
+    const albums = await utils.db.table('albums')
       .where('userid', id)
       .where('enabled', 1)
       .select('id', 'identifier')
 
     if (albums.length) {
       const albumids = albums.map(album => album.id)
-      await db.table('albums')
+      await utils.db.table('albums')
         .whereIn('id', albumids)
         .del()
       utils.invalidateAlbumsCache(albumids)
@@ -331,7 +330,7 @@ self.deleteUser = async (req, res, next) => {
       }))
     }
 
-    await db.table('users')
+    await utils.db.table('users')
       .where('id', id)
       .del()
     utils.invalidateStatsCache('users')
@@ -353,7 +352,7 @@ self.listUsers = async (req, res, next) => {
     const isadmin = perms.is(user, 'admin')
     if (!isadmin) throw new ClientError('', { statusCode: 403 })
 
-    const count = await db.table('users')
+    const count = await utils.db.table('users')
       .count('id as count')
       .then(rows => rows[0].count)
     if (!count) return res.json({ success: true, users: [], count })
@@ -362,7 +361,7 @@ self.listUsers = async (req, res, next) => {
     if (isNaN(offset)) offset = 0
     else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
 
-    const users = await db.table('users')
+    const users = await utils.db.table('users')
       .limit(25)
       .offset(25 * offset)
       .select('id', 'username', 'enabled', 'timestamp', 'permission', 'registration')
@@ -376,7 +375,7 @@ self.listUsers = async (req, res, next) => {
       pointers[user.id] = user
     }
 
-    const uploads = await db.table('files')
+    const uploads = await utils.db.table('files')
       .whereIn('userid', Object.keys(pointers))
       .select('userid', 'size')
 

@@ -14,7 +14,6 @@ const multerStorage = require('./utils/multerStorage')
 const ServerError = require('./utils/ServerError')
 const config = require('./../config')
 const logger = require('./../logger')
-const db = require('knex')(config.database)
 
 const self = {
   onHold: new Set(),
@@ -213,7 +212,7 @@ self.getUniqueRandomName = async (length, extension) => {
       // Put token on-hold (wait for it to be inserted to DB)
       self.onHold.add(identifier)
 
-      const file = await db.table('files')
+      const file = await utils.db.table('files')
         .whereRaw('?? like ?', ['name', `${identifier}.%`])
         .select('id')
         .first()
@@ -827,7 +826,7 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
 
   await Promise.all(infoMap.map(async info => {
     // Check if the file exists by checking its hash and size
-    const dbFile = await db.table('files')
+    const dbFile = await utils.db.table('files')
       .where(function () {
         if (user === undefined) {
           this.whereNull('userid')
@@ -892,7 +891,7 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
   if (files.length) {
     let authorizedIds = []
     if (albumids.length) {
-      authorizedIds = await db.table('albums')
+      authorizedIds = await utils.db.table('albums')
         .where({ userid: user.id })
         .whereIn('id', albumids)
         .select('id')
@@ -907,7 +906,7 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
     }
 
     // Insert new files to DB
-    await db.table('files').insert(files)
+    await utils.db.table('files').insert(files)
     utils.invalidateStatsCache('uploads')
 
     if (config.uploads.queryDbForFileCollisions) {
@@ -920,7 +919,7 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
 
     // Update albums' timestamp
     if (authorizedIds.length) {
-      await db.table('albums')
+      await utils.db.table('albums')
         .whereIn('id', authorizedIds)
         .update('editedAt', Math.floor(Date.now() / 1000))
       utils.invalidateAlbumsCache(authorizedIds)
@@ -1253,7 +1252,7 @@ self.list = async (req, res, next) => {
           usernames.push(...filterObj.queries.exclude.user)
         }
 
-        const uploaders = await db.table('users')
+        const uploaders = await utils.db.table('users')
           .whereIn('username', usernames)
           .select('id', 'username')
 
@@ -1490,7 +1489,7 @@ self.list = async (req, res, next) => {
     }
 
     // Query uploads count for pagination
-    const count = await db.table('files')
+    const count = await utils.db.table('files')
       .where(filter)
       .count('id as count')
       .then(rows => rows[0].count)
@@ -1516,16 +1515,16 @@ self.list = async (req, res, next) => {
       orderByRaw = sortObj.parsed.map(sort => {
         // Use Knex.raw() to sanitize user inputs
         if (sort.cast) {
-          return db.raw(`cast (?? as ${sort.cast}) ${sort.order} ${sort.clause}`.trim(), sort.column)
+          return utils.db.raw(`cast (?? as ${sort.cast}) ${sort.order} ${sort.clause}`.trim(), sort.column)
         } else {
-          return db.raw(`?? ${sort.order} ${sort.clause}`.trim(), sort.column)
+          return utils.db.raw(`?? ${sort.order} ${sort.clause}`.trim(), sort.column)
         }
       }).join(', ')
     } else {
       orderByRaw = '`id` desc'
     }
 
-    const files = await db.table('files')
+    const files = await utils.db.table('files')
       .where(filter)
       .orderByRaw(orderByRaw)
       .limit(25)
@@ -1549,7 +1548,7 @@ self.list = async (req, res, next) => {
         .filter((v, i, a) => {
           return v !== null && v !== undefined && v !== '' && a.indexOf(v) === i
         })
-      albums = await db.table('albums')
+      albums = await utils.db.table('albums')
         .whereIn('id', albumids)
         .where('enabled', 1)
         .select('id', 'name')
@@ -1579,7 +1578,7 @@ self.list = async (req, res, next) => {
       if (!userids.length) return res.json({ success: true, files, count, albums, basedomain })
 
       // Query usernames of user IDs from currently selected files
-      usersTable = await db.table('users')
+      usersTable = await utils.db.table('users')
         .whereIn('id', userids)
         .select('id', 'username')
     }

@@ -48,7 +48,6 @@ const api = require('./routes/api')
 const nojs = require('./routes/nojs')
 const player = require('./routes/player')
 
-const db = require('knex')(config.database)
 const isDevMode = process.env.NODE_ENV === 'development'
 
 // Helmet security headers
@@ -144,7 +143,7 @@ const initServeStaticUploads = (opts = {}) => {
         const relpath = path.replace(paths.uploads, '')
         if (relpath.indexOf('/', 1) === -1 && req.method === 'GET') {
           const name = relpath.substring(1)
-          const file = await db.table('files')
+          const file = await utils.db.table('files')
             .where('name', name)
             .select('original')
             .first()
@@ -250,7 +249,7 @@ safe.use('/api', api)
 ;(async () => {
   try {
     // Init database
-    await require('./database/db.js')(db)
+    await require('./database/db.js')(utils.db)
 
     // Verify paths, create missing ones, clean up temp ones
     await paths.init()
@@ -335,7 +334,7 @@ safe.use('/api', api)
 
     // Cache file identifiers
     if (config.uploads.cacheFileIdentifiers) {
-      utils.idSet = await db.table('files')
+      utils.idSet = await utils.db.table('files')
         .select('name')
         .then(rows => {
           return new Set(rows.map(row => row.name.split('.')[0]))
