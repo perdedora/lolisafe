@@ -2,8 +2,8 @@ const path = require('path')
 const paths = require('./pathsController')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
-const config = require('./../config')
-const logger = require('./../logger')
+const config = require('../config')
+const logger = require('../logger')
 
 const self = {
   errorPagesCodes: Object.keys(config.errorPages)
@@ -11,7 +11,7 @@ const self = {
     .map(key => Number(key))
 }
 
-self.handle = (error, req, res, next) => {
+self.handlerError = (req, res, error) => {
   if (!res || res.headersSent) {
     console.error('Unexpected missing "res" object or headers alredy sent.')
     return console.trace()
@@ -58,7 +58,7 @@ self.handle = (error, req, res, next) => {
   }
 }
 
-self.handleMissing = (req, res, next) => {
+self.handlerNotFound = (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   return res.status(404).sendFile(path.join(paths.errorRoot, config.errorPages[404]))
 }

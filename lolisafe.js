@@ -10,14 +10,13 @@ process.on('unhandledRejection', error => {
 })
 
 // Require libraries
-const bodyParser = require('body-parser')
 const contentDisposition = require('content-disposition')
-const express = require('express')
 const helmet = require('helmet')
+const HyperExpress = require('hyper-express')
+const LiveDirectory = require('live-directory')
 const NodeClam = require('clamscan')
 const nunjucks = require('nunjucks')
-const path = require('path')
-const rateLimit = require('express-rate-limit')
+// const rateLimit = require('express-rate-limit') // FIXME: Find alternative
 const { accessSync, constants } = require('fs')
 
 // Check required config files
@@ -38,9 +37,10 @@ const versions = require('./src/versions')
 
 // lolisafe
 logger.log('Starting lolisafe\u2026')
-const safe = express()
+const safe = new HyperExpress.Server({
+  trust_proxy: Boolean(config.trustProxy)
+})
 
-const errors = require('./controllers/errorsController')
 const paths = require('./controllers/pathsController')
 paths.initSync()
 const utils = require('./controllers/utilsController')
@@ -91,21 +91,44 @@ if (config.accessControlAllowOrigin) {
   })
 }
 
-if (config.trustProxy) {
-  safe.set('trust proxy', 1)
+const initLiveDirectory = (options = {}) => {
+  if (!options.ignore) {
+    options.ignore = path => {
+      // ignore dot files
+      return path.startsWith('.')
+    }
+  }
+  return new LiveDirectory(options)
 }
 
 // https://mozilla.github.io/nunjucks/api.html#configure
-nunjucks.configure('views', {
+const nunjucksEnv = nunjucks.configure('views', {
   autoescape: true,
-  express: safe,
   watch: isDevMode
   // noCache: isDevMode
 })
-safe.set('view engine', 'njk')
-safe.enable('view cache')
+
+const renderNunjucks = (res, path, params) => {
+  return new Promise((resolve, reject) => {
+    nunjucksEnv.render(`${path}.njk`, params, (err, html) => {
+      if (err) return reject(err)
+      resolve(html)
+    })
+  }).then(html => {
+    return res.type('html').send(html)
+  })
+}
+
+// Bind a global middleware which will attach to our helper method into all incoming requests
+safe.use((req, res, next) => {
+  // Inject the render method onto the response object on each requet
+  res.render = (path, params) => renderNunjucks(res, path, params)
+  next()
+})
 
 // Configure rate limits (disabled during development)
+// FIXME: express-rate-limit does not work with hyper-express, find alternative
+/*
 if (!isDevMode && Array.isArray(config.rateLimits) && config.rateLimits.length) {
   for (const _rateLimit of config.rateLimits) {
     const limiter = rateLimit(_rateLimit.config)
@@ -114,9 +137,7 @@ if (!isDevMode && Array.isArray(config.rateLimits) && config.rateLimits.length) 
     }
   }
 }
-
-safe.use(bodyParser.urlencoded({ extended: true }))
-safe.use(bodyParser.json())
+*/
 
 const cdnPages = [...config.pages]
 let setHeaders
@@ -179,15 +200,17 @@ const initServeStaticUploads = (opts = {}) => {
     // which it will await before creating 'send' stream to client.
     // This is necessary due to database queries being async tasks,
     // and express/serve-static not having the functionality by default.
-    safe.use('/', require('@bobbywibowo/serve-static')(paths.uploads, opts))
-    logger.debug('Inititated SimpleDataStore for Content-Disposition: ' +
-      `{ limit: ${utils.contentDispositionStore.limit}, strategy: "${utils.contentDispositionStore.strategy}" }`)
+    // safe.use('/', require('@bobbywibowo/serve-static')(paths.uploads, opts))
+    // logger.debug('Inititated SimpleDataStore for Content-Disposition: ' +
+    //   `{ limit: ${utils.contentDispositionStore.limit}, strategy: "${utils.contentDispositionStore.strategy}" }`)
+    logger.error('initServeStaticUploads() was called, but still WIP')
   } else {
-    safe.use('/', express.static(paths.uploads, opts))
+    // safe.use('/', express.static(paths.uploads, opts))
+    logger.error('initServeStaticUploads() was called, but still WIP')
   }
 }
 
-// Cache control (safe.fiery.me)
+// Cache control
 if (config.cacheControl) {
   const cacheControls = {
     // max-age: 6 months
@@ -212,9 +235,8 @@ if (config.cacheControl) {
       // If using CDN, cache public pages in CDN
       cdnPages.push('api/check')
       for (const page of cdnPages) {
-        safe.get(`/${page === 'home' ? '' : page}`, (req, res, next) => {
+        safe.get(`/${page === 'home' ? '' : page}`, async (req, res) => {
           res.set('Cache-Control', cacheControls.cdn)
-          next()
         })
       }
       break
@@ -264,9 +286,25 @@ if (config.cacheControl) {
 }
 
 // Static assets
-safe.use('/', express.static(paths.public, { setHeaders }))
-safe.use('/', express.static(paths.dist, { setHeaders }))
+const liveDirectoryPublic = initLiveDirectory({ path: paths.public })
+const liveDirectoryDist = initLiveDirectory({ path: paths.dist })
+safe.use('/', (req, res, next) => {
+  // Only process GET and HEAD requests
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return next()
+  }
+  // Try to find asset from public directory, then dist directory
+  const file = liveDirectoryPublic.get(req.path) || liveDirectoryDist.get(req.path)
+  if (file === undefined) {
+    return next()
+  }
+  if (typeof setHeaders === 'function') {
+    setHeaders(res)
+  }
+  return res.type(file.extension).send(file.buffer)
+})
 
+// Routes
 safe.use('/', album)
 safe.use('/', file)
 safe.use('/', nojs)
@@ -276,7 +314,7 @@ safe.use('/api', api)
 ;(async () => {
   try {
     // Init database
-    await require('./controllers/utils/initDatabase.js')(utils.db)
+    await require('./controllers/utils/initDatabase')(utils.db)
 
     // Purge any leftover in chunks directory, do not wait
     paths.purgeChunks()
@@ -297,6 +335,11 @@ safe.use('/api', api)
       }
     }
 
+    const liveDirectoryCustomPages = initLiveDirectory({
+      path: paths.customPages,
+      keep: ['.html']
+    })
+
     // Cookie Policy
     if (config.cookiePolicy) {
       config.pages.push('cookiepolicy')
@@ -304,23 +347,27 @@ safe.use('/api', api)
 
     // Check for custom pages, otherwise fallback to Nunjucks templates
     for (const page of config.pages) {
-      const customPage = path.join(paths.customPages, `${page}.html`)
-      if (!await paths.access(customPage).catch(() => true)) {
-        safe.get(`/${page === 'home' ? '' : page}`, (req, res, next) => res.sendFile(customPage))
+      // FIXME: Have this update on-the-fly or don't use LiveDirectory
+      const customPage = liveDirectoryCustomPages.get(`${page}.html`)
+      if (customPage) {
+        safe.get(`/${page === 'home' ? '' : page}`, (req, res) => {
+          res.type('html').send(customPage.buffer)
+        })
       } else if (page === 'home') {
-        safe.get('/', (req, res, next) => res.render(page, {
+        safe.get('/', (req, res) => res.render(page, {
           config, utils, versions: utils.versionStrings
         }))
       } else {
-        safe.get(`/${page}`, (req, res, next) => res.render(page, {
+        safe.get(`/${page}`, (req, res) => res.render(page, {
           config, utils, versions: utils.versionStrings
         }))
       }
     }
 
-    // Express error handlers
-    safe.use(errors.handleMissing)
-    safe.use(errors.handle)
+    // Web server error handlers (must always be set after all routes/routers)
+    const errorsController = require('./controllers/errorsController')
+    safe.set_not_found_handler(errorsController.handlerNotFound)
+    safe.set_error_handler(errorsController.handlerError)
 
     // Git hash
     if (config.showGitHash) {
@@ -355,7 +402,7 @@ safe.use('/api', api)
     }
 
     // Binds Express to port
-    await new Promise(resolve => safe.listen(utils.conf.port, () => resolve()))
+    await safe.listen(utils.conf.port)
     logger.log(`lolisafe started on port ${utils.conf.port}`)
 
     // Cache control (safe.fiery.me)

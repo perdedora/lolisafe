@@ -1,13 +1,14 @@
-const routes = require('express').Router()
+const { Router } = require('hyper-express')
+const routes = new Router()
 const path = require('path')
-const paths = require('./../controllers/pathsController')
+const errors = require('../controllers/errorsController')
 const utils = require('./../controllers/utilsController')
 const config = require('./../config')
 
-routes.get('/a/:identifier', async (req, res, next) => {
+routes.get('/a/:identifier', async (req, res) => {
   const identifier = req.params.identifier
   if (identifier === undefined) {
-    res.status(404).sendFile(path.join(paths.errorRoot, config.errorPages[404]))
+    return errors.handlerNotFound(req, res)
   }
 
   const album = await utils.db.table('albums')
@@ -19,7 +20,7 @@ routes.get('/a/:identifier', async (req, res, next) => {
     .first()
 
   if (!album || album.public === 0) {
-    return res.status(404).sendFile(path.join(paths.errorRoot, config.errorPages[404]))
+    return errors.handlerNotFound(req, res)
   }
 
   const nojs = req.query.nojs !== undefined
