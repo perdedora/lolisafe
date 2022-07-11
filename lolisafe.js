@@ -10,7 +10,6 @@ process.on('unhandledRejection', error => {
 })
 
 // Libraries
-const contentDisposition = require('content-disposition')
 const helmet = require('helmet')
 const HyperExpress = require('hyper-express')
 const LiveDirectory = require('live-directory')
@@ -130,74 +129,6 @@ const cdnPages = [...config.pages]
 // Defaults to no-op
 let setHeadersForStaticAssets = () => {}
 
-const contentTypes = typeof config.overrideContentTypes === 'object' &&
-  Object.keys(config.overrideContentTypes)
-const overrideContentTypes = contentTypes && contentTypes.length && function (res, path) {
-  // Do only if accessing files from uploads' root directory (i.e. not thumbs, etc.)
-  const relpath = path.replace(paths.uploads, '')
-  if (relpath.indexOf('/', 1) === -1) {
-    const name = relpath.substring(1)
-    const extname = utils.extname(name).substring(1)
-    for (const contentType of contentTypes) {
-      if (config.overrideContentTypes[contentType].includes(extname)) {
-        res.set('Content-Type', contentType)
-        break
-      }
-    }
-  }
-}
-
-const initServeStaticUploads = (opts = {}) => {
-  if (config.setContentDisposition) {
-    const SimpleDataStore = require('./controllers/utils/SimpleDataStore')
-    utils.contentDispositionStore = new SimpleDataStore(
-      config.contentDispositionOptions || {
-        limit: 50,
-        strategy: SimpleDataStore.STRATEGIES[0]
-      }
-    )
-    opts.preSetHeaders = async (res, req, path, stat) => {
-      // Do only if accessing files from uploads' root directory (i.e. not thumbs, etc.),
-      // AND only if GET requests
-      const relpath = path.replace(paths.uploads, '')
-      if (relpath.indexOf('/', 1) !== -1 || req.method !== 'GET') return
-      const name = relpath.substring(1)
-      try {
-        let original = utils.contentDispositionStore.get(name)
-        if (original === undefined) {
-          utils.contentDispositionStore.hold(name)
-          original = await utils.db.table('files')
-            .where('name', name)
-            .select('original')
-            .first()
-            .then(_file => {
-              utils.contentDispositionStore.set(name, _file.original)
-              return _file.original
-            })
-        }
-        if (original) {
-          res.set('Content-Disposition', contentDisposition(original, { type: 'inline' }))
-        }
-      } catch (error) {
-        utils.contentDispositionStore.delete(name)
-        logger.error(error)
-      }
-    }
-    // serveStatic is provided with @bobbywibowo/serve-static, a fork of express/serve-static.
-    // The fork allows specifying an async function by the name preSetHeaders,
-    // which it will await before creating 'send' stream to client.
-    // This is necessary due to database queries being async tasks,
-    // and express/serve-static not having the functionality by default.
-    // safe.use('/', require('@bobbywibowo/serve-static')(paths.uploads, opts))
-    // logger.debug('Inititated SimpleDataStore for Content-Disposition: ' +
-    //   `{ limit: ${utils.contentDispositionStore.limit}, strategy: "${utils.contentDispositionStore.strategy}" }`)
-    logger.error('initServeStaticUploads() was called, but still WIP')
-  } else {
-    // safe.use('/', express.static(paths.uploads, opts))
-    logger.error('initServeStaticUploads() was called, but still WIP')
-  }
-}
-
 // Cache control
 if (config.cacheControl) {
   const cacheControls = {
@@ -232,23 +163,6 @@ if (config.cacheControl) {
       break
   }
 
-  // If serving uploads with node
-  if (config.serveFilesWithNode) {
-    initServeStaticUploads({
-      setHeaders: (res, path) => {
-        // Override Content-Type header if necessary
-        if (overrideContentTypes) {
-          overrideContentTypes(res, path)
-        }
-        // If using CDN, cache uploads in CDN as well
-        // Use with cloudflare.purgeCache enabled in config file
-        if (config.cacheControl !== 2) {
-          res.set('Cache-Control', cacheControls.cdn)
-        }
-      }
-    })
-  }
-
   // Function for static assets.
   // This requires the assets to use version in their query string,
   // as they will be cached by clients for a very long time.
@@ -266,13 +180,6 @@ if (config.cacheControl) {
     }
     return next()
   })
-} else if (config.serveFilesWithNode) {
-  const opts = {}
-  // Override Content-Type header if necessary
-  if (overrideContentTypes) {
-    opts.setHeaders = overrideContentTypes
-  }
-  initServeStaticUploads(opts)
 }
 
 // Static assets
@@ -352,6 +259,23 @@ safe.use('/api', api)
           config, utils, versions: utils.versionStrings
         }))
       }
+    }
+
+    // Init ServerStatic last if serving uploaded files with node
+    /* // TODO
+    if (config.serveFilesWithNode) {
+      const serveStaticInstance = new ServeStatic(paths.uploads, {
+        contentDispositionOptions: config.contentDispositionOptions,
+        overrideContentTypes: config.overrideContentTypes,
+        setContentDisposition: config.setContentDisposition
+      })
+      safe.use('/', serveStaticInstance.middleware)
+      utils.contentDispositionStore = serveStaticInstance.contentDispositionStore
+    }
+    */
+    if (config.serveFilesWithNode) {
+      logger.error('Serving files with node is currently not available in this branch.')
+      return process.exit(1)
     }
 
     // Web server error handlers (must always be set after all routes/middlewares)
