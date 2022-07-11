@@ -41,6 +41,7 @@ const safe = new HyperExpress.Server({
   trust_proxy: Boolean(config.trustProxy)
 })
 
+const errors = require('./controllers/errorsController')
 const paths = require('./controllers/pathsController')
 paths.initSync()
 const utils = require('./controllers/utilsController')
@@ -364,10 +365,9 @@ safe.use('/api', api)
       }
     }
 
-    // Web server error handlers (must always be set after all routes/routers)
-    const errorsController = require('./controllers/errorsController')
-    safe.set_not_found_handler(errorsController.handlerNotFound)
-    safe.set_error_handler(errorsController.handlerError)
+    // Web server error handlers (must always be set after all routes/middlewares)
+    safe.set_not_found_handler(errors.handleNotFound)
+    safe.set_error_handler(errors.handleError)
 
     // Git hash
     if (config.showGitHash) {

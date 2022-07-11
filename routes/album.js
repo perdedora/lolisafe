@@ -8,7 +8,7 @@ const config = require('./../config')
 routes.get('/a/:identifier', async (req, res) => {
   const identifier = req.params.identifier
   if (identifier === undefined) {
-    return errors.handlerNotFound(req, res)
+    return errors.handleNotFound(req, res)
   }
 
   const album = await utils.db.table('albums')
@@ -20,7 +20,7 @@ routes.get('/a/:identifier', async (req, res) => {
     .first()
 
   if (!album || album.public === 0) {
-    return errors.handlerNotFound(req, res)
+    return errors.handleNotFound(req, res)
   }
 
   const nojs = req.query.nojs !== undefined

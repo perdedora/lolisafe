@@ -11,7 +11,7 @@ const self = {
     .map(key => Number(key))
 }
 
-self.handlerError = (req, res, error) => {
+self.handleError = (req, res, error) => {
   if (!res || res.headersSent) {
     console.error('Unexpected missing "res" object or headers alredy sent.')
     return console.trace()
@@ -58,7 +58,7 @@ self.handlerError = (req, res, error) => {
   }
 }
 
-self.handlerNotFound = (req, res) => {
+self.handleNotFound = (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   return res.status(404).sendFile(path.join(paths.errorRoot, config.errorPages[404]))
 }
