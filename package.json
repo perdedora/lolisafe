@@ -34,7 +34,6 @@
     "full-upgrade": "rm -f ./yarn.lock && yarn"
   },
   "dependencies": {
-    "@bobbywibowo/serve-static": "git+https://git@github.com/BobbyWibowo/serve-static#8030f1b3cb17cf75b69d7ead8db3e879f6fc992f",
     "bcrypt": "~5.0.1",
     "better-sqlite3": "~7.5.3",
     "blake3": "~2.1.7",
