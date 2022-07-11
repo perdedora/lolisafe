@@ -9,13 +9,12 @@ process.on('unhandledRejection', error => {
   logger.error(error, { prefix: 'Unhandled Rejection (Promise): ' })
 })
 
-// Require libraries
+// Libraries
 const contentDisposition = require('content-disposition')
 const helmet = require('helmet')
 const HyperExpress = require('hyper-express')
 const LiveDirectory = require('live-directory')
 const NodeClam = require('clamscan')
-const nunjucks = require('nunjucks')
 // const rateLimit = require('express-rate-limit') // FIXME: Find alternative
 const { accessSync, constants } = require('fs')
 
@@ -31,7 +30,7 @@ for (const _file of configFiles) {
   }
 }
 
-// Require config files
+// Config files
 const config = require('./config')
 const versions = require('./src/versions')
 
@@ -46,6 +45,11 @@ const paths = require('./controllers/pathsController')
 paths.initSync()
 const utils = require('./controllers/utilsController')
 
+// Custom middlewares
+const NunjucksRenderer = require('./controllers/middlewares/nunjucksRenderer')
+// const ServeStatic = require('./controllers/middlewares/serveStatic') // TODO
+
+// Routes
 const album = require('./routes/album')
 const api = require('./routes/api')
 const file = require('./routes/file')
@@ -92,6 +96,12 @@ if (config.accessControlAllowOrigin) {
   })
 }
 
+// NunjucksRenderer middleware
+const nunjucksRendererInstance = new NunjucksRenderer('views', {
+  watch: isDevMode
+})
+safe.use('/', nunjucksRendererInstance.middleware)
+
 const initLiveDirectory = (options = {}) => {
   if (!options.ignore) {
     options.ignore = path => {
@@ -101,31 +111,6 @@ const initLiveDirectory = (options = {}) => {
   }
   return new LiveDirectory(options)
 }
-
-// https://mozilla.github.io/nunjucks/api.html#configure
-const nunjucksEnv = nunjucks.configure('views', {
-  autoescape: true,
-  watch: isDevMode
-  // noCache: isDevMode
-})
-
-const renderNunjucks = (res, path, params) => {
-  return new Promise((resolve, reject) => {
-    nunjucksEnv.render(`${path}.njk`, params, (err, html) => {
-      if (err) return reject(err)
-      resolve(html)
-    })
-  }).then(html => {
-    return res.type('html').send(html)
-  })
-}
-
-// Bind a global middleware which will attach to our helper method into all incoming requests
-safe.use((req, res, next) => {
-  // Inject the render method onto the response object on each requet
-  res.render = (path, params) => renderNunjucks(res, path, params)
-  next()
-})
 
 // Configure rate limits (disabled during development)
 // FIXME: express-rate-limit does not work with hyper-express, find alternative
