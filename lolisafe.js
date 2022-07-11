@@ -126,7 +126,9 @@ if (!isDevMode && Array.isArray(config.rateLimits) && config.rateLimits.length) 
 */
 
 const cdnPages = [...config.pages]
-let setHeaders
+
+// Defaults to no-op
+let setHeadersForStaticAssets = () => {}
 
 const contentTypes = typeof config.overrideContentTypes === 'object' &&
   Object.keys(config.overrideContentTypes)
@@ -211,8 +213,10 @@ if (config.cacheControl) {
 
   // By default soft cache everything
   safe.use('/', (req, res, next) => {
+    // FIXME: Routes further down the line that may set  their own Cache-Control headers,
+    // will end up with multiple headers
     res.set('Cache-Control', cacheControls.validate)
-    next()
+    return next()
   })
 
   switch (config.cacheControl) {
@@ -248,19 +252,19 @@ if (config.cacheControl) {
   // Function for static assets.
   // This requires the assets to use version in their query string,
   // as they will be cached by clients for a very long time.
-  setHeaders = res => {
+  setHeadersForStaticAssets = (req, res) => {
     res.set('Cache-Control', cacheControls.static)
   }
 
   // Consider album ZIPs static as well, since they use version in their query string
-  safe.use(['/api/album/zip'], (req, res, next) => {
+  safe.use('/api/album/zip', (req, res, next) => {
     const versionString = parseInt(req.query.v)
     if (versionString > 0) {
       res.set('Cache-Control', cacheControls.static)
     } else {
       res.set('Cache-Control', cacheControls.disable)
     }
-    next()
+    return next()
   })
 } else if (config.serveFilesWithNode) {
   const opts = {}
@@ -276,18 +280,18 @@ const liveDirectoryPublic = initLiveDirectory({ path: paths.public })
 const liveDirectoryDist = initLiveDirectory({ path: paths.dist })
 safe.use('/', (req, res, next) => {
   // Only process GET and HEAD requests
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    return next()
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    // Try to find asset from public directory, then dist directory
+    const file =
+      liveDirectoryPublic.get(req.path) ||
+      liveDirectoryDist.get(req.path)
+    if (file === undefined) {
+      return next()
+    }
+    setHeadersForStaticAssets(req, res)
+    return res.type(file.extension).send(file.buffer)
   }
-  // Try to find asset from public directory, then dist directory
-  const file = liveDirectoryPublic.get(req.path) || liveDirectoryDist.get(req.path)
-  if (file === undefined) {
-    return next()
-  }
-  if (typeof setHeaders === 'function') {
-    setHeaders(res)
-  }
-  return res.type(file.extension).send(file.buffer)
+  return next()
 })
 
 // Routes
