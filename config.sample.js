@@ -84,9 +84,14 @@ module.exports = {
 
   /*
     Pages to process for the frontend.
+
     To add new pages, you may create a new Nunjucks-templated pages (.njk) in "views" directory,
-    or regular HTML files (.html) in "pages/custom" directory,
     then simply add the filename without its extension name into the array below.
+
+    Alternatively, you may create regular HTML files (.html) in "pages/custom" directory.
+    If doing so, you don't need to add the filename into the array,
+    as any changes in said directory will be detected live.
+    You may even add or remove pages while lolisafe is running.
   */
   pages: ['home', 'auth', 'dashboard', 'faq'],
 
