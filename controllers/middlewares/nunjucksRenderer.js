@@ -47,7 +47,8 @@ class NunjucksRenderer {
         resolve(html)
       })
     }).then(html => {
-      return res.type('html').send(html)
+      res.type('html').send(html)
+      return html
     })
   }
 
