@@ -294,15 +294,24 @@ self.upload = async (req, res) => {
 
       // Write the file into disk, and return an object containing the required file information
       const file = await new Promise((resolve, reject) => {
+        const finalPath = path.join(destination, filename)
+
         // "weighted" resolve function, to be able to "await" multiple callbacks
         const REQUIRED_WEIGHT = 2
-        let tempObject = { originalname, extname }
-        let tempWeight = 0
+        let _result = {
+          destination,
+          extname,
+          filename,
+          mimetype: field.mime_type,
+          originalname,
+          path: finalPath
+        }
+        let _weight = 0
         const _resolve = (result = {}, weight = 2) => {
-          tempWeight += weight
-          tempObject = Object.assign(result, tempObject)
-          if (tempWeight >= REQUIRED_WEIGHT) {
-            resolve(tempObject)
+          _weight += weight
+          _result = Object.assign(result, _result)
+          if (_weight >= REQUIRED_WEIGHT) {
+            resolve(_result)
           }
         }
 
@@ -313,8 +322,6 @@ self.upload = async (req, res) => {
           hash.dispose()
           reject(error)
         }
-
-        const finalPath = path.join(destination, filename)
 
         if (isChunk) {
           if (!chunksData.stream) {
@@ -343,31 +350,19 @@ self.upload = async (req, res) => {
         field.file.stream.on('data', d => hash.update(d))
 
         if (isChunk) {
-          field.file.stream.on('end', () => {
-            _resolve({
-              destination,
-              filename,
-              path: finalPath
-            })
-          })
+          field.file.stream.on('end', () => _resolve())
           field.file.stream.pipe(outStream, { end: false })
         } else {
-          outStream.on('finish', () => {
-            _resolve({
-              destination,
-              filename,
-              path: finalPath,
-              size: outStream.bytesWritten,
-              hash: hash.digest('hex')
-            }, scanStream ? 1 : 2)
-          })
+          outStream.on('finish', () => _resolve({
+            size: outStream.bytesWritten,
+            hash: hash.digest('hex')
+          }, scanStream ? 1 : 2)
+          )
 
           if (scanStream) {
             logger.debug(`[ClamAV]: ${filename}: Passthrough scanning\u2026`)
             scanStream.on('error', onerror)
-            scanStream.on('scan-complete', scan => {
-              _resolve({ scan }, 1)
-            })
+            scanStream.on('scan-complete', scan => _resolve({ scan }, 1))
             field.file.stream.pipe(scanStream).pipe(outStream)
           } else {
             field.file.stream.pipe(outStream)
