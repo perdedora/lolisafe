@@ -1,9 +1,9 @@
 
 const contentDisposition = require('content-disposition')
-const SimpleDataStore = require('../utils/SimpleDataStore')
-const paths = require('../pathsController')
-const utils = require('../utilsController')
-const logger = require('../../logger')
+const SimpleDataStore = require('./../utils/SimpleDataStore')
+const paths = require('./../pathsController')
+const utils = require('./../utilsController')
+const logger = require('./../../logger')
 
 class ServeStatic {
   directory

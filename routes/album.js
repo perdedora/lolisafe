@@ -1,7 +1,7 @@
 const { Router } = require('hyper-express')
 const routes = new Router()
 const path = require('path')
-const errors = require('../controllers/errorsController')
+const errors = require('./../controllers/errorsController')
 const utils = require('./../controllers/utilsController')
 const config = require('./../config')
 
