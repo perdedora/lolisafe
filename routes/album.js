@@ -32,7 +32,7 @@ routes.get('/a/:identifier', async (req, res) => {
 
     const cache = utils.albumRenderStore.get(cacheid)
     if (cache) {
-      return res.send(cache)
+      return res.type('html').send(cache)
     } else if (cache === null) {
       return res.render('album-notice', {
         config,
@@ -75,27 +75,25 @@ routes.get('/a/:identifier', async (req, res) => {
     ? utils.md.instance.render(album.description)
     : null
 
-  return res.render('album', {
+  // This will already end the Response,
+  // thus may only continue with tasks that will not interface with Response any further
+  const html = await res.render('album', {
     config,
     utils,
     versions: utils.versionStrings,
     album,
     files,
     nojs
-  }, (error, html) => {
-    const data = error ? null : html
-    if (cacheid) {
-      // Only store rendered page if it did not error out and album actually have files
-      if (data && files.length) {
-        utils.albumRenderStore.set(cacheid, data)
-      } else {
-        utils.albumRenderStore.delete(cacheid)
-      }
-    }
-
-    // Express should already send error to the next handler
-    if (!error) return res.send(data)
   })
+
+  if (cacheid) {
+    // Only store rendered page if it did not error out and album actually have files
+    if (html && files.length) {
+      utils.albumRenderStore.set(cacheid, html)
+    } else {
+      utils.albumRenderStore.delete(cacheid)
+    }
+  }
 })
 
 module.exports = routes
