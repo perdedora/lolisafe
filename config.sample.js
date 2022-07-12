@@ -206,42 +206,20 @@ module.exports = {
   trustProxy: true,
 
   /*
-    Rate limits.
-    Please be aware that these apply to all users, including site owners.
-    https://github.com/nfriedly/express-rate-limit/tree/v6.3.0#configuration
+    Rate limiters.
+    https://github.com/animir/node-rate-limiter-flexible/wiki/Memory
   */
-  rateLimits: [
-    {
-      // 10 requests in 1 second
-      routes: [
-        '/api/'
-      ],
-      config: {
-        windowMs: 1000,
-        max: 10,
-        legacyHeaders: true,
-        standardHeaders: true,
-        message: {
-          success: false,
-          description: 'Rate limit reached, please try again in a while.'
-        }
-      }
-    },
+  rateLimiters: [
     {
       // 2 requests in 5 seconds
       routes: [
+        // If multiple routes, they will share the same points pool
         '/api/login',
         '/api/register'
       ],
-      config: {
-        windowMs: 5 * 1000,
-        max: 2,
-        legacyHeaders: true,
-        standardHeaders: true,
-        message: {
-          success: false,
-          description: 'Rate limit reached, please try again in 5 seconds.'
-        }
+      options: {
+        points: 2,
+        duration: 5
       }
     },
     {
@@ -249,11 +227,9 @@ module.exports = {
       routes: [
         '/api/album/zip'
       ],
-      config: {
-        windowMs: 30 * 1000,
-        max: 6,
-        legacyHeaders: true,
-        standardHeaders: true
+      options: {
+        points: 6,
+        duration: 30
       }
     },
     {
@@ -261,17 +237,33 @@ module.exports = {
       routes: [
         '/api/tokens/change'
       ],
-      config: {
-        windowMs: 60 * 1000,
-        max: 1,
-        legacyHeaders: true,
-        standardHeaders: true,
-        message: {
-          success: false,
-          description: 'Rate limit reached, please try again in 60 seconds.'
-        }
+      options: {
+        points: 1,
+        duration: 60
+      }
+    },
+    /*
+      Routes, whose scope would have encompassed other routes that have their own rate limit pools,
+      must only be set after said routes, otherwise their rate limit pools will never trigger.
+      i.e. since /api/ encompass all other /api/* routes, it must be set last
+    */
+    {
+      // 10 requests in 1 second
+      routes: [
+        '/api/'
+      ],
+      options: {
+        points: 10,
+        duration: 1
       }
     }
+  ],
+
+  /*
+    Whitelisted IP addresses for rate limiters.
+  */
+  rateLimitersWhitelist: [
+    '127.0.0.1'
   ],
 
   /*

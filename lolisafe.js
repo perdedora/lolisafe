@@ -14,7 +14,6 @@ const helmet = require('helmet')
 const HyperExpress = require('hyper-express')
 const LiveDirectory = require('live-directory')
 const NodeClam = require('clamscan')
-// const rateLimit = require('express-rate-limit') // FIXME: Find alternative
 const { accessSync, constants } = require('fs')
 
 // Check required config files
@@ -46,6 +45,7 @@ const utils = require('./controllers/utilsController')
 
 // Custom middlewares
 const NunjucksRenderer = require('./controllers/middlewares/nunjucksRenderer')
+const RateLimiter = require('./controllers/middlewares/rateLimiter')
 // const ServeStatic = require('./controllers/middlewares/serveStatic') // TODO
 
 // Routes
@@ -56,6 +56,21 @@ const nojs = require('./routes/nojs')
 const player = require('./routes/player')
 
 const isDevMode = process.env.NODE_ENV === 'development'
+
+// Rate limiters
+if (Array.isArray(config.rateLimiters)) {
+  let whitelistedKeys
+  if (Array.isArray(config.rateLimitersWhitelist)) {
+    whitelistedKeys = new Set(config.rateLimitersWhitelist)
+  }
+  for (const rateLimit of config.rateLimiters) {
+    // Init RateLimiter using Request.ip as key
+    const rateLimiterInstance = new RateLimiter('ip', rateLimit.options, whitelistedKeys)
+    for (const route of rateLimit.routes) {
+      safe.use(route, rateLimiterInstance.middleware)
+    }
+  }
+}
 
 // Helmet security headers
 if (config.helmet instanceof Object) {
@@ -110,19 +125,6 @@ const initLiveDirectory = (options = {}) => {
   }
   return new LiveDirectory(options)
 }
-
-// Configure rate limits (disabled during development)
-// FIXME: express-rate-limit does not work with hyper-express, find alternative
-/*
-if (!isDevMode && Array.isArray(config.rateLimits) && config.rateLimits.length) {
-  for (const _rateLimit of config.rateLimits) {
-    const limiter = rateLimit(_rateLimit.config)
-    for (const route of _rateLimit.routes) {
-      safe.use(route, limiter)
-    }
-  }
-}
-*/
 
 const cdnPages = [...config.pages]
 
