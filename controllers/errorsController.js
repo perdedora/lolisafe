@@ -13,8 +13,8 @@ const self = {
 
 self.handleError = (req, res, error) => {
   if (!res || res.headersSent) {
-    console.error('Unexpected missing "res" object or headers alredy sent.')
-    return console.trace()
+    console.error('Error: Unexpected missing "res" object or headers alredy sent.')
+    return console.error(error)
   }
 
   // Error messages that can be returned to users
