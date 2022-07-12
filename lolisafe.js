@@ -242,24 +242,26 @@ safe.use('/api', api)
       config.pages.push('cookiepolicy')
     }
 
-    // Check for custom pages, otherwise fallback to Nunjucks templates
-    for (const page of config.pages) {
-      // FIXME: Have this update on-the-fly or don't use LiveDirectory
-      const customPage = liveDirectoryCustomPages.get(`${page}.html`)
-      if (customPage) {
-        safe.get(`/${page === 'home' ? '' : page}`, (req, res) => {
-          res.type('html').send(customPage.buffer)
-        })
-      } else if (page === 'home') {
-        safe.get('/', (req, res) => res.render(page, {
-          config, utils, versions: utils.versionStrings
-        }))
-      } else {
-        safe.get(`/${page}`, (req, res) => res.render(page, {
-          config, utils, versions: utils.versionStrings
-        }))
+    // Front-end pages middleware
+    // HTML files in customPages directory can also override any built-in pages,
+    // if they have matching names with the routes (e.g. home.html can override the homepage)
+    // Aside from that, due to using LiveDirectory,
+    // custom pages can be added/removed on the fly while lolisafe is running
+    safe.use((req, res, next) => {
+      if (req.method === 'GET' || req.method === 'HEAD') {
+        const page = req.path === '/' ? 'home' : req.path.substring(1)
+        const customPage = liveDirectoryCustomPages.get(`${page}.html`)
+        if (customPage) {
+          return res.type('html').send(customPage.buffer)
+        } else if (config.pages.includes(page)) {
+          // These rendered pages are persistently cached during production
+          return res.render(page, {
+            config, utils, versions: utils.versionStrings
+          }, !isDevMode)
+        }
       }
-    }
+      return next()
+    })
 
     // Init ServerStatic last if serving uploaded files with node
     /* // TODO

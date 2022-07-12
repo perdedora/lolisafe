@@ -4,6 +4,8 @@ class NunjucksRenderer {
   directory
   environment
 
+  #persistentCaches = new Map()
+
   constructor (directory = '', options = {}) {
     if (typeof directory !== 'string') {
       throw new TypeError('Root directory must be a string value')
@@ -21,14 +23,27 @@ class NunjucksRenderer {
 
   #middleware (req, res, next) {
     // Inject render() method into Response on each requests
-    res.render = (path, params) => this.#render(res, path, params)
+    // If usePersistentCache, the rendered template will be cached forever (thus only use for absolutely static pages)
+    res.render = (path, params, usePersistentCache) => this.#render(res, path, params, usePersistentCache)
     return next()
   }
 
-  #render (res, path, params) {
+  #render (res, path, params, usePersistentCache) {
     return new Promise((resolve, reject) => {
-      this.environment.render(`${path}.njk`, params, (err, html) => {
-        if (err) return reject(err)
+      const template = `${path}.njk`
+
+      const cached = this.#persistentCaches.get(template)
+      if (usePersistentCache && cached) {
+        return resolve(cached)
+      }
+
+      this.environment.render(template, params, (err, html) => {
+        if (err) {
+          return reject(err)
+        }
+        if (usePersistentCache) {
+          this.#persistentCaches.set(template, html)
+        }
         resolve(html)
       })
     }).then(html => {
