@@ -109,8 +109,6 @@ class ServeStatic {
     logger.log(`ServeStatic.middleware(): ${this.directory}, ${req.path}`)
 
     // TODO
-
-    return next()
   }
 
   get middleware () {
