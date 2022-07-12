@@ -219,151 +219,188 @@ self.upload = async (req, res) => {
   req.body = {}
 
   // Initially try to parse as multipart
-  await req.multipart(async field => {
-    // Keep non-files fields in Request.body
-    if (field.truncated) {
-      // Re-map Dropzone chunked uploads keys so people can manually use the API without prepending 'dz'
-      let name = field.name
-      if (name.startsWith('dz')) name = name.replace(/^dz/, '')
-
-      req.body[name] = field.value
-      return
+  const multipartErrors = []
+  await req.multipart({
+    // https://github.com/mscdex/busboy/tree/v1.6.0#exports
+    limits: {
+      fileSize: maxSizeBytes,
+      // Maximum number of non-file fields.
+      // Dropzone.js will add 6 extra fields for chunked uploads.
+      // We don't use them for anything else.
+      fields: 6,
+      // Maximum number of file fields.
+      // Chunked uploads still need to provide ONLY 1 file field.
+      // Otherwise, only one of the files will end up being properly stored,
+      // and that will also be as a chunk.
+      files: maxFilesPerUpload
     }
-
-    if (!field.file) {
-      throw new Error(`Unexpected non-truncated and non-file field: ${field.name}`)
-    }
-
-    // Init Request.files array if not previously set
-    if (req.files === undefined) {
-      req.files = []
-    }
-
-    // NOTE: Since busboy@1, filenames are not automatically parsed as UTF-8, so we force it here
-    const originalname = field.file.name &&
-      Buffer.from(field.file.name, 'latin1').toString('utf8')
-
-    const extname = utils.extname(originalname)
-    if (self.isExtensionFiltered(extname)) {
-      throw new ClientError(`${extname ? `${extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
-    }
-
-    if (req.body.chunkindex !== undefined && !chunkedUploads) {
-      throw new ClientError('Chunked uploads are disabled at the moment.')
-    }
-
-    // Is it a chunk file?
-    const isChunk = chunkedUploads &&
-      req.body.uuid !== undefined &&
-      req.body.chunkindex !== undefined
-
-    let chunksData
-    let destination
-    let filename
-    if (isChunk) {
-      // Calling this will also reset its timeout
-      chunksData = await initChunks(req.body.uuid)
-      destination = chunksData.root
-      filename = chunksData.filename
-    } else {
-      const length = self.parseFileIdentifierLength(req.headers.filelength)
-      destination = paths.uploads
-      filename = await self.getUniqueRandomName(length, extname)
-    }
-
-    // Write the file into disk, and return an object containing the required file information
-    const file = await new Promise((resolve, reject) => {
-      // "weighted" resolve function, to be able to "await" multiple callbacks
-      const REQUIRED_WEIGHT = 2
-      let tempObject = { originalname, extname }
-      let tempWeight = 0
-      const _resolve = (result = {}, weight = 2) => {
-        tempWeight += weight
-        tempObject = Object.assign(result, tempObject)
-        if (tempWeight >= REQUIRED_WEIGHT) {
-          resolve(tempObject)
+  }, async field => {
+    // Wrap this to capture errors within this callback
+    try {
+      // Keep non-files fields in Request.body
+      // Since fields get processed in sequence depending on the order at which they were defined,
+      // chunked uploads data must be set before the files[] field which contain the actual file
+      if (field.truncated) {
+        // Re-map Dropzone chunked uploads keys so people can manually use the API without prepending 'dz'
+        let name = field.name
+        if (name.startsWith('dz')) {
+          name = name.replace(/^dz/, '')
         }
+
+        req.body[name] = field.value
+        return
       }
 
-      let outStream
-      let hash
-      let scanStream
-      const onerror = error => {
-        hash.dispose()
-        reject(error)
+      if (!field.file) {
+        throw new ClientError(`Unexpected field: "${field.name}"`)
       }
 
-      const finalPath = path.join(destination, filename)
+      // Init Request.files array if not previously set
+      if (req.files === undefined) {
+        req.files = []
+      }
 
+      // NOTE: Since busboy@1, filenames no longer get automatically parsed as UTF-8, so we force it here
+      const originalname = field.file.name &&
+        Buffer.from(field.file.name, 'latin1').toString('utf8')
+
+      const extname = utils.extname(originalname)
+      if (self.isExtensionFiltered(extname)) {
+        throw new ClientError(`${extname ? `${extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
+      }
+
+      if (req.body.chunkindex !== undefined && !chunkedUploads) {
+        throw new ClientError('Chunked uploads are disabled at the moment.')
+      }
+
+      // Is it a chunk file?
+      const isChunk = chunkedUploads &&
+        req.body.uuid !== undefined &&
+        req.body.chunkindex !== undefined
+
+      let chunksData
+      let destination
+      let filename
       if (isChunk) {
-        if (!chunksData.stream) {
-          chunksData.stream = fs.createWriteStream(finalPath, { flags: 'a' })
-          chunksData.stream.on('error', onerror)
-        }
-        if (!chunksData.hasher) {
-          chunksData.hasher = blake3.createHash()
-        }
-
-        outStream = chunksData.stream
-        hash = chunksData.hasher
+        // Calling this will also reset its timeout
+        chunksData = await initChunks(req.body.uuid)
+        destination = chunksData.root
+        filename = chunksData.filename
       } else {
-        outStream = fs.createWriteStream(finalPath)
-        outStream.on('error', onerror)
-        hash = blake3.createHash()
+        const length = self.parseFileIdentifierLength(req.headers.filelength)
+        destination = paths.uploads
+        filename = await self.getUniqueRandomName(length, extname)
+      }
 
-        if (utils.scan.passthrough &&
+      // Write the file into disk, and return an object containing the required file information
+      const file = await new Promise((resolve, reject) => {
+        // "weighted" resolve function, to be able to "await" multiple callbacks
+        const REQUIRED_WEIGHT = 2
+        let tempObject = { originalname, extname }
+        let tempWeight = 0
+        const _resolve = (result = {}, weight = 2) => {
+          tempWeight += weight
+          tempObject = Object.assign(result, tempObject)
+          if (tempWeight >= REQUIRED_WEIGHT) {
+            resolve(tempObject)
+          }
+        }
+
+        let outStream
+        let hash
+        let scanStream
+        const onerror = error => {
+          hash.dispose()
+          reject(error)
+        }
+
+        const finalPath = path.join(destination, filename)
+
+        if (isChunk) {
+          if (!chunksData.stream) {
+            chunksData.stream = fs.createWriteStream(finalPath, { flags: 'a' })
+            chunksData.stream.on('error', onerror)
+          }
+          if (!chunksData.hasher) {
+            chunksData.hasher = blake3.createHash()
+          }
+
+          outStream = chunksData.stream
+          hash = chunksData.hasher
+        } else {
+          outStream = fs.createWriteStream(finalPath)
+          outStream.on('error', onerror)
+          hash = blake3.createHash()
+
+          if (utils.scan.passthrough &&
           !self.scanHelpers.assertUserBypass(req._user, filename) &&
           !self.scanHelpers.assertFileBypass({ filename })) {
-          scanStream = utils.scan.instance.passthrough()
+            scanStream = utils.scan.instance.passthrough()
+          }
         }
-      }
 
-      field.file.stream.on('error', onerror)
-      field.file.stream.on('data', d => hash.update(d))
+        field.file.stream.on('error', onerror)
+        field.file.stream.on('data', d => hash.update(d))
 
-      if (isChunk) {
-        field.file.stream.on('end', () => {
-          _resolve({
-            destination,
-            filename,
-            path: finalPath
+        if (isChunk) {
+          field.file.stream.on('end', () => {
+            _resolve({
+              destination,
+              filename,
+              path: finalPath
+            })
           })
-        })
-        field.file.stream.pipe(outStream, { end: false })
-      } else {
-        outStream.on('finish', () => {
-          _resolve({
-            destination,
-            filename,
-            path: finalPath,
-            size: outStream.bytesWritten,
-            hash: hash.digest('hex')
-          }, scanStream ? 1 : 2)
-        })
-
-        if (scanStream) {
-          logger.debug(`[ClamAV]: ${filename}: Passthrough scanning\u2026`)
-          scanStream.on('error', onerror)
-          scanStream.on('scan-complete', scan => {
-            _resolve({ scan }, 1)
-          })
-          field.file.stream.pipe(scanStream).pipe(outStream)
+          field.file.stream.pipe(outStream, { end: false })
         } else {
-          field.file.stream.pipe(outStream)
-        }
-      }
-    })
+          outStream.on('finish', () => {
+            _resolve({
+              destination,
+              filename,
+              path: finalPath,
+              size: outStream.bytesWritten,
+              hash: hash.digest('hex')
+            }, scanStream ? 1 : 2)
+          })
 
-    // Push file to Request.files array
-    req.files.push(file)
+          if (scanStream) {
+            logger.debug(`[ClamAV]: ${filename}: Passthrough scanning\u2026`)
+            scanStream.on('error', onerror)
+            scanStream.on('scan-complete', scan => {
+              _resolve({ scan }, 1)
+            })
+            field.file.stream.pipe(scanStream).pipe(outStream)
+          } else {
+            field.file.stream.pipe(outStream)
+          }
+        }
+      })
+
+      // Push file to Request.files array
+      req.files.push(file)
+    } catch (error) {
+      multipartErrors.push(error)
+    }
   }).catch(error => {
-    // MulipartField may throw string errors
+    // res.multipart() itself may throw string errors
     if (typeof error === 'string') {
-      throw new ServerError(error)
+      throw new ClientError(error)
     } else {
       throw error
     }
   })
+
+  if (multipartErrors.length) {
+    for (let i = 1; i < multipartErrors.length; i++) {
+      if (multipartErrors[i] instanceof ClientError ||
+        multipartErrors[i] instanceof ServerError) {
+        continue
+      }
+      // Log additional errors to console if they are not generic ClientError or ServeError
+      logger.error(multipartErrors[i])
+    }
+    // Re-throw the first multipart error into global error handler
+    throw multipartErrors[0]
+  }
 
   if (Array.isArray(req.files)) {
     return self.actuallyUpload(req, res, user, albumid, age)
