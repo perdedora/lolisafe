@@ -155,11 +155,15 @@ if (config.cacheControl) {
     case true:
       // If using CDN, cache public pages in CDN
       cdnPages.push('api/check')
-      for (const page of cdnPages) {
-        safe.get(`/${page === 'home' ? '' : page}`, async (req, res) => {
-          res.set('Cache-Control', cacheControls.cdn)
-        })
-      }
+      safe.use((req, res, next) => {
+        if (req.method === 'GET' || req.method === 'HEAD') {
+          const page = req.path === '/' ? 'home' : req.path.substring(1)
+          if (cdnPages.includes(page)) {
+            res.set('Cache-Control', cacheControls.cdn)
+          }
+        }
+        return next()
+      })
       break
   }
 
