@@ -3796,7 +3796,7 @@ linkify-it@^4.0.1:
   dependencies:
     uc.micro "^1.0.1"
 
-live-directory@^2.3.2:
+live-directory@~2.3.2:
   version "2.3.2"
   resolved "https://registry.yarnpkg.com/live-directory/-/live-directory-2.3.2.tgz#17945a1386ed439af24228c802f6546c0fa85a9b"
   integrity sha512-s/QBuRkngjzUU8kVkrklqT/2/je4GYE45HiVZ8WwFNTvswXknlsC5vdgv4ycOrL/76CBMjrG7rySFpX8nX80gg==
@@ -5373,7 +5373,7 @@ range-parser@^1.2.1:
   resolved "https://registry.yarnpkg.com/range-parser/-/range-parser-1.2.1.tgz#3cf37023d199e1c24d1a55b84800c2f3e6468031"
   integrity sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==
 
-rate-limiter-flexible@^2.3.7:
+rate-limiter-flexible@~2.3.7:
   version "2.3.7"
   resolved "https://registry.yarnpkg.com/rate-limiter-flexible/-/rate-limiter-flexible-2.3.7.tgz#c23e1f818a1575f1de1fd173437f4072125e1615"
   integrity sha512-dmc+J/IffVBvHlqq5/XClsdLdkOdQV/tjrz00cwneHUbEDYVrf4aUDAyR4Jybcf2+Vpn4NwoVrnnAyt/D0ciWw==
