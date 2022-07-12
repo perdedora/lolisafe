@@ -2,9 +2,10 @@ const { RateLimiterMemory } = require('rate-limiter-flexible')
 const ClientError = require('./../utils/ClientError')
 
 class RateLimiter {
+  rateLimiterMemory
+
   #requestKey
   #whitelistedKeys
-  rateLimiterMemory
 
   constructor (requestKey, options = {}, whitelistedKeys) {
     if (typeof options.points !== 'number' || typeof options.duration !== 'number') {
