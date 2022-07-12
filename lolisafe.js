@@ -146,8 +146,6 @@ if (config.cacheControl) {
 
   // By default soft cache everything
   safe.use('/', (req, res, next) => {
-    // FIXME: Routes further down the line that may set  their own Cache-Control headers,
-    // will end up with multiple headers
     res.set('Cache-Control', cacheControls.validate)
     return next()
   })

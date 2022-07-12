@@ -3108,10 +3108,10 @@ https-proxy-agent@^5.0.0:
     agent-base "6"
     debug "4"
 
-hyper-express@^6.2.4:
-  version "6.2.4"
-  resolved "https://registry.yarnpkg.com/hyper-express/-/hyper-express-6.2.4.tgz#9a36b10a712f953ac8ee45212c220e919a7a875e"
-  integrity sha512-jZNtQItuso5jJVeeu6Zuw1dB17xcSd6Ey4bOilOIt/QDFhLmzpuWPzG6VFk748+JMQMtlzqRFlbGNApeyOATtw==
+hyper-express@~6.2.5:
+  version "6.2.5"
+  resolved "https://registry.yarnpkg.com/hyper-express/-/hyper-express-6.2.5.tgz#2cbd2d703495ed241a8da29abaf156490d3fe309"
+  integrity sha512-Jj7R+mkxwE2/m8H4A+8Ojn/BhJRkzGvYMWU9+wl/Ljhle67H4yStR5izK5oyfUGAmAwX2uM9PocXm+Ae+KT07Q==
   dependencies:
     "@types/busboy" "^0.3.1"
     "@types/express" "^4.17.13"
