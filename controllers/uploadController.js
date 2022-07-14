@@ -221,6 +221,15 @@ self.upload = async (req, res) => {
   // Initially try to parse as multipart
   const multipartFieldErrors = []
   let hasMultipartField = false
+
+  const unlinkFiles = async files => {
+    if (!Array.isArray(files) || !files.length) return
+    return Promise.all(files.map(async file => {
+      if (!file.filename) return
+      return utils.unlinkFile(file.filename).catch(logger.error)
+    }))
+  }
+
   await req.multipart({
     // https://github.com/mscdex/busboy/tree/v1.6.0#exports
     limits: {
@@ -383,10 +392,17 @@ self.upload = async (req, res) => {
           }
         }
       })
+
+      if (config.filterEmptyFile && file.size === 0) {
+        throw new ClientError('Empty files are not allowed.')
+      }
     } catch (error) {
       multipartFieldErrors.push(error)
     }
   }).catch(error => {
+    // Unlink temp files (do not wait)
+    unlinkFiles(req.files)
+
     // res.multipart() itself may throw string errors
     if (typeof error === 'string') {
       throw new ClientError(error)
@@ -396,6 +412,9 @@ self.upload = async (req, res) => {
   })
 
   if (multipartFieldErrors.length) {
+    // Unlink temp files (do not wait)
+    unlinkFiles(req.files)
+
     for (let i = 1; i < multipartFieldErrors.length; i++) {
       if (multipartFieldErrors[i] instanceof ClientError ||
         multipartFieldErrors[i] instanceof ServerError) {
@@ -404,6 +423,7 @@ self.upload = async (req, res) => {
       // Log additional errors to console if they are not generic ClientError or ServeError
       logger.error(multipartFieldErrors[i])
     }
+
     // Re-throw the first multipart error into global error handler
     throw multipartFieldErrors[0]
   }
@@ -432,15 +452,6 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
   }
 
   const filesData = req.files
-  if (config.filterEmptyFile && filesData.some(file => file.size === 0)) {
-    // Unlink all files when at least one file is an empty file
-    // Should continue even when encountering errors
-    await Promise.all(filesData.map(file =>
-      utils.unlinkFile(file.filename).catch(logger.error)
-    ))
-
-    throw new ClientError('Empty files are not allowed.')
-  }
 
   if (utils.scan.instance) {
     let scanResult
