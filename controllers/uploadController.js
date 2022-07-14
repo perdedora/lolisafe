@@ -488,8 +488,8 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
     }
   }
 
-  const downloaded = []
   const filesData = []
+
   await Promise.all(urls.map(async url => {
     // Push immediately as we will only be adding props into the file object down the line
     const file = {
@@ -549,9 +549,6 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
       writeStream = fs.createWriteStream(file.path)
       hashStream = blake3.createHash()
 
-      // Push to array early, so regardless of its progress it will be deleted on errors
-      downloaded.push(file.path)
-
       // Limit max response body size with maximum allowed size
       const fetchFile = await fetch(url, { method: 'GET', size: urlMaxSizeBytes })
         .then(res => new Promise((resolve, reject) => {
@@ -594,11 +591,10 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
       throw err
     })
   })).catch(async error => {
-    // Unlink all downloaded files when at least one file threw an error from the for-loop
-    // Should continue even when encountering errors
-    if (downloaded.length) {
-      await Promise.all(downloaded.map(file =>
-        utils.unlinkFile(file).catch(logger.error)
+    // Unlink temp files (do not wait)
+    if (filesData.length) {
+      Promise.all(filesData.map(async file =>
+        utils.unlinkFile(file.filename).catch(logger.error)
       ))
     }
 
@@ -648,12 +644,12 @@ self.finishChunks = async (req, res) => {
 
   return self.actuallyFinishChunks(req, res, user, files)
     .catch(error => {
-      // Should continue even when encountering errors
-      files.forEach(file => {
+      // Unlink temp files (do not wait)
+      Promise.all(files.map(async file => {
         if (file.uuid && chunksData[file.uuid]) {
-          self.cleanUpChunks(file.uuid).catch(logger.error)
+          return self.cleanUpChunks(file.uuid).catch(logger.error)
         }
-      })
+      }))
       // Re-throw errors
       throw error
     })
@@ -821,9 +817,8 @@ self.assertPassthroughScans = async (req, user, filesData) => {
   }
 
   if (result) {
-    // Unlink all files when at least one threat is found
-    // Should continue even when encountering errors
-    await Promise.all(filesData.map(file =>
+    // Unlink temp files (do not wait)
+    Promise.all(filesData.map(async file =>
       utils.unlinkFile(file.filename).catch(logger.error)
     ))
   }
@@ -871,9 +866,8 @@ self.scanFiles = async (req, user, filesData) => {
   })
 
   if (result) {
-    // Unlink all files when at least one threat is found OR any errors occurred
-    // Should continue even when encountering errors
-    await Promise.all(filesData.map(file =>
+    // Unlink temp files (do not wait)
+    Promise.all(filesData.map(async file =>
       utils.unlinkFile(file.filename).catch(logger.error)
     ))
   }
@@ -887,13 +881,12 @@ self.stripTags = async (req, filesData) => {
   if (!self.parseStripTags(req.headers.striptags)) return
 
   try {
-    await Promise.all(filesData.map(file =>
+    await Promise.all(filesData.map(async file =>
       utils.stripTags(file.filename, file.extname)
     ))
   } catch (error) {
-    // Unlink all files when at least one threat is found OR any errors occurred
-    // Should continue even when encountering errors
-    await Promise.all(filesData.map(file =>
+    // Unlink temp files (do not wait)
+    Promise.all(filesData.map(async file =>
       utils.unlinkFile(file.filename).catch(logger.error)
     ))
 
