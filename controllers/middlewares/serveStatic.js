@@ -1,4 +1,3 @@
-
 const contentDisposition = require('content-disposition')
 const SimpleDataStore = require('./../utils/SimpleDataStore')
 const paths = require('./../pathsController')
