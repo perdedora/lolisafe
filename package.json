@@ -42,7 +42,7 @@
     "fastq": "~1.13.0",
     "fluent-ffmpeg": "~2.1.2",
     "helmet": "~5.1.0",
-    "hyper-express": "~6.2.6",
+    "hyper-express": "~6.3.0",
     "jszip": "~3.10.0",
     "knex": "~2.1.0",
     "live-directory": "~2.3.2",
