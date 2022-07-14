@@ -70,6 +70,9 @@ if (Array.isArray(config.rateLimiters)) {
       safe.use(route, rateLimiterInstance.middleware)
     }
   }
+} else if (config.rateLimits) {
+  logger.error('Config option "rateLimits" is deprecated.')
+  logger.error('Please consult the provided sample file for the new option "rateLimiters".')
 }
 
 // Helmet security headers
