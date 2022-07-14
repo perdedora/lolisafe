@@ -219,16 +219,7 @@ self.upload = async (req, res) => {
   req.body = {}
 
   // Initially try to parse as multipart
-  const multipartFieldErrors = []
-  let hasMultipartField = false
-
-  const unlinkFiles = async files => {
-    if (!Array.isArray(files) || !files.length) return
-    return Promise.all(files.map(async file => {
-      if (!file.filename) return
-      return utils.unlinkFile(file.filename).catch(logger.error)
-    }))
-  }
+  let hasMultipartField = true
 
   await req.multipart({
     // https://github.com/mscdex/busboy/tree/v1.6.0#exports
@@ -245,30 +236,24 @@ self.upload = async (req, res) => {
       files: maxFilesPerUpload
     }
   }, async field => {
-    // Wrap this to capture errors within this handler function,
-    // since it will be spawned in a separate context
-    try {
-      hasMultipartField = true
+    hasMultipartField = true
 
-      // Keep non-files fields in Request.body
-      // Since fields get processed in sequence depending on the order at which they were defined,
-      // chunked uploads data must be set before the files[] field which contain the actual file
-      if (field.truncated) {
-        // Re-map Dropzone chunked uploads keys so people can manually use the API without prepending 'dz'
-        let name = field.name
-        if (name.startsWith('dz')) {
-          name = name.replace(/^dz/, '')
-        }
-
-        req.body[name] = field.value
-        return
+    // Keep non-files fields in Request.body
+    // Since fields get processed in sequence depending on the order at which they were defined,
+    // chunked uploads data must be set before the files[] field which contain the actual file
+    if (field.truncated) {
+      // Re-map Dropzone chunked uploads keys so people can manually use the API without prepending 'dz'
+      let name = field.name
+      if (name.startsWith('dz')) {
+        name = name.replace(/^dz/, '')
       }
 
-      // NOTE: This will probably never happen, but just in case
-      if (!field.file) {
-        throw new ClientError(`Unexpected field: "${field.name}"`)
-      }
+      req.body[name] = field.value
+      return
+    }
 
+    // Process files immediately and push into Request.files array
+    if (field.file) {
       // Init Request.files array if not previously set
       if (req.files === undefined) {
         req.files = []
@@ -321,24 +306,34 @@ self.upload = async (req, res) => {
         const REQUIRED_WEIGHT = 2
         let _weight = 0
         const _resolve = (props = {}, weight = 2) => {
+          if (file.error) return
           Object.assign(file, props)
           _weight += weight
-          if (_weight >= REQUIRED_WEIGHT) resolve()
+          if (_weight >= REQUIRED_WEIGHT) {
+            return resolve()
+          }
         }
 
         const readStream = field.file.stream
         let writeStream
         let hashStream
         let scanStream
-        const onerror = error => {
-          hashStream.dispose()
-          reject(error)
+
+        const _reject = error => {
+          file.error = true
+          if (writeStream && !writeStream.closed) {
+            writeStream.end()
+          }
+          if (hashStream.hash.hash) {
+            hashStream.dispose()
+          }
+          return reject(error)
         }
 
         if (file.isChunk) {
           if (!file.chunksData.writeStream) {
             file.chunksData.writeStream = fs.createWriteStream(file.path, { flags: 'a' })
-            file.chunksData.writeStream.on('error', onerror)
+            file.chunksData.writeStream.on('error', _reject)
           }
           if (!file.chunksData.hashStream) {
             file.chunksData.hashStream = blake3.createHash()
@@ -348,7 +343,7 @@ self.upload = async (req, res) => {
           hashStream = file.chunksData.hashStream
         } else {
           writeStream = fs.createWriteStream(file.path)
-          writeStream.on('error', onerror)
+          writeStream.on('error', _reject)
           hashStream = blake3.createHash()
 
           if (utils.scan.passthrough &&
@@ -358,7 +353,7 @@ self.upload = async (req, res) => {
           }
         }
 
-        readStream.on('error', onerror)
+        readStream.on('error', _reject)
         readStream.on('data', d => {
           // .dispose() will destroy this internal component,
           // so use it as an indicator of whether the hashStream has been .dispose()'d
@@ -376,13 +371,15 @@ self.upload = async (req, res) => {
           // both writeStream and scanStream finish
           writeStream.on('finish', () => _resolve({
             size: writeStream.bytesWritten,
-            hash: hashStream.digest('hex')
+            hash: hashStream.hash.hash ? hashStream.digest('hex') : null
           }, scanStream ? 1 : 2))
 
           if (scanStream) {
             logger.debug(`[ClamAV]: ${file.filename}: Passthrough scanning\u2026`)
-            scanStream.on('error', onerror)
-            scanStream.on('scan-complete', scan => _resolve({ scan }, 1))
+            scanStream.on('error', _reject)
+            scanStream.on('scan-complete', scan => _resolve({
+              scan
+            }, 1))
             readStream
               .pipe(scanStream)
               .pipe(writeStream)
@@ -396,12 +393,16 @@ self.upload = async (req, res) => {
       if (config.filterEmptyFile && file.size === 0) {
         throw new ClientError('Empty files are not allowed.')
       }
-    } catch (error) {
-      multipartFieldErrors.push(error)
     }
   }).catch(error => {
     // Unlink temp files (do not wait)
-    unlinkFiles(req.files)
+    if (Array.isArray(req.files)) {
+      Promise.all(req.files.map(async file => {
+        if (file.filename) {
+          return utils.unlinkFile(file.filename).catch(logger.error)
+        }
+      }))
+    }
 
     // res.multipart() itself may throw string errors
     if (typeof error === 'string') {
@@ -411,21 +412,9 @@ self.upload = async (req, res) => {
     }
   })
 
-  if (multipartFieldErrors.length) {
-    // Unlink temp files (do not wait)
-    unlinkFiles(req.files)
-
-    for (let i = 1; i < multipartFieldErrors.length; i++) {
-      if (multipartFieldErrors[i] instanceof ClientError ||
-        multipartFieldErrors[i] instanceof ServerError) {
-        continue
-      }
-      // Log additional errors to console if they are not generic ClientError or ServeError
-      logger.error(multipartFieldErrors[i])
-    }
-
-    // Re-throw the first multipart error into global error handler
-    throw multipartFieldErrors[0]
+  // If Request connection dropped during multiform upload
+  if (req._readableState.closed) {
+    return
   }
 
   if (hasMultipartField) {
