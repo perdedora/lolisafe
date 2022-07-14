@@ -221,6 +221,13 @@ self.upload = async (req, res) => {
   // Initially try to parse as multipart
   let hasMultipartField = true
 
+  const unlinkFiles = async files => {
+    return Promise.all(files.map(async file => {
+      if (!file.filename) return
+      return utils.unlinkFile(file.filename).catch(logger.error)
+    }))
+  }
+
   await req.multipart({
     // https://github.com/mscdex/busboy/tree/v1.6.0#exports
     limits: {
@@ -396,12 +403,8 @@ self.upload = async (req, res) => {
     }
   }).catch(error => {
     // Unlink temp files (do not wait)
-    if (Array.isArray(req.files)) {
-      Promise.all(req.files.map(async file => {
-        if (file.filename) {
-          return utils.unlinkFile(file.filename).catch(logger.error)
-        }
-      }))
+    if (Array.isArray(req.files) && req.files.length) {
+      unlinkFiles(req.files)
     }
 
     // res.multipart() itself may throw string errors
@@ -412,12 +415,16 @@ self.upload = async (req, res) => {
     }
   })
 
-  // If Request connection dropped during multiform upload
-  if (req._readableState.closed) {
-    return
-  }
-
   if (hasMultipartField) {
+    if (!Array.isArray(req.files) || !req.files.length) {
+      throw new ClientError('No files.')
+    } else if (req.files.some(file => file.error)) {
+      // Unlink temp files (do not wait)
+      unlinkFiles(req.files)
+      // If req.multipart() did not error out, but some file object did,
+      // then Request connection was likely dropped
+      return
+    }
     return self.actuallyUpload(req, res, user)
   } else {
     // Parse POST body
@@ -427,10 +434,6 @@ self.upload = async (req, res) => {
 }
 
 self.actuallyUpload = async (req, res, user, data = {}) => {
-  if (!req.files || !req.files.length) {
-    throw new ClientError('No files.')
-  }
-
   // If chunked uploads is enabled and the uploaded file is a chunk, then just say that it was a success
   const uuid = req.body.uuid
   if (chunkedUploads && chunksData[uuid] !== undefined) {
