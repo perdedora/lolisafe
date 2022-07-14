@@ -54,8 +54,8 @@ class ChunksData {
     this.root = root
     this.filename = 'tmp'
     this.chunks = 0
-    this.stream = null
-    this.hasher = null
+    this.writeStream = null
+    this.hashStream = null
   }
 
   onTimeout () {
@@ -219,7 +219,8 @@ self.upload = async (req, res) => {
   req.body = {}
 
   // Initially try to parse as multipart
-  const multipartErrors = []
+  const multipartFieldErrors = []
+  let hasMultipartField = false
   await req.multipart({
     // https://github.com/mscdex/busboy/tree/v1.6.0#exports
     limits: {
@@ -235,8 +236,11 @@ self.upload = async (req, res) => {
       files: maxFilesPerUpload
     }
   }, async field => {
-    // Wrap this to capture errors within this callback
+    // Wrap this to capture errors within this handler function,
+    // since it will be spawned in a separate context
     try {
+      hasMultipartField = true
+
       // Keep non-files fields in Request.body
       // Since fields get processed in sequence depending on the order at which they were defined,
       // chunked uploads data must be set before the files[] field which contain the actual file
@@ -251,6 +255,7 @@ self.upload = async (req, res) => {
         return
       }
 
+      // NOTE: This will probably never happen, but just in case
       if (!field.file) {
         throw new ClientError(`Unexpected field: "${field.name}"`)
       }
@@ -260,120 +265,120 @@ self.upload = async (req, res) => {
         req.files = []
       }
 
+      // Push immediately as we will only be adding props into the file object down the line
+      const file = {
+        albumid,
+        age,
+        mimetype: field.mime_type,
+        isChunk: req.body.uuid !== undefined &&
+          req.body.chunkindex !== undefined
+      }
+      req.files.push(file)
+
+      if (file.isChunk) {
+        if (!chunkedUploads) {
+          throw new ClientError('Chunked uploads are disabled at the moment.')
+        } else if (req.files.length > 1) {
+          throw new ClientError('Chunked uploads may only be uploaded 1 chunk at a time.')
+        }
+      }
+
       // NOTE: Since busboy@1, filenames no longer get automatically parsed as UTF-8, so we force it here
-      const originalname = field.file.name &&
+      file.originalname = field.file.name &&
         Buffer.from(field.file.name, 'latin1').toString('utf8')
 
-      const extname = utils.extname(originalname)
-      if (self.isExtensionFiltered(extname)) {
-        throw new ClientError(`${extname ? `${extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
+      file.extname = utils.extname(file.originalname)
+      if (self.isExtensionFiltered(file.extname)) {
+        throw new ClientError(`${file.extname ? `${file.extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
       }
 
-      if (req.body.chunkindex !== undefined && !chunkedUploads) {
-        throw new ClientError('Chunked uploads are disabled at the moment.')
-      }
-
-      // Is it a chunk file?
-      const isChunk = chunkedUploads &&
-        req.body.uuid !== undefined &&
-        req.body.chunkindex !== undefined
-
-      let chunksData
       let destination
-      let filename
-      if (isChunk) {
-        // Calling this will also reset its timeout
-        chunksData = await initChunks(req.body.uuid)
-        destination = chunksData.root
-        filename = chunksData.filename
+      if (file.isChunk) {
+        // Calling this will also reset this chunked uploads' timeout
+        file.chunksData = await initChunks(req.body.uuid)
+        file.filename = file.chunksData.filename
+        destination = file.chunksData.root
       } else {
         const length = self.parseFileIdentifierLength(req.headers.filelength)
+        file.filename = await self.getUniqueRandomName(length, file.extname)
         destination = paths.uploads
-        filename = await self.getUniqueRandomName(length, extname)
       }
 
-      // Write the file into disk, and return an object containing the required file information
-      const file = await new Promise((resolve, reject) => {
-        const finalPath = path.join(destination, filename)
+      file.path = path.join(destination, file.filename)
 
+      // Write the file into disk, and supply required props into file object
+      await new Promise((resolve, reject) => {
         // "weighted" resolve function, to be able to "await" multiple callbacks
         const REQUIRED_WEIGHT = 2
-        let _result = {
-          destination,
-          extname,
-          filename,
-          mimetype: field.mime_type,
-          originalname,
-          path: finalPath
-        }
         let _weight = 0
-        const _resolve = (result = {}, weight = 2) => {
+        const _resolve = (props = {}, weight = 2) => {
+          Object.assign(file, props)
           _weight += weight
-          _result = Object.assign(result, _result)
-          if (_weight >= REQUIRED_WEIGHT) {
-            resolve(_result)
-          }
+          if (_weight >= REQUIRED_WEIGHT) resolve()
         }
 
-        let outStream
-        let hash
+        const readStream = field.file.stream
+        let writeStream
+        let hashStream
         let scanStream
         const onerror = error => {
-          hash.dispose()
+          hashStream.dispose()
           reject(error)
         }
 
-        if (isChunk) {
-          if (!chunksData.stream) {
-            chunksData.stream = fs.createWriteStream(finalPath, { flags: 'a' })
-            chunksData.stream.on('error', onerror)
+        if (file.isChunk) {
+          if (!file.chunksData.writeStream) {
+            file.chunksData.writeStream = fs.createWriteStream(file.path, { flags: 'a' })
+            file.chunksData.writeStream.on('error', onerror)
           }
-          if (!chunksData.hasher) {
-            chunksData.hasher = blake3.createHash()
+          if (!file.chunksData.hashStream) {
+            file.chunksData.hashStream = blake3.createHash()
           }
 
-          outStream = chunksData.stream
-          hash = chunksData.hasher
+          writeStream = file.chunksData.writeStream
+          hashStream = file.chunksData.hashStream
         } else {
-          outStream = fs.createWriteStream(finalPath)
-          outStream.on('error', onerror)
-          hash = blake3.createHash()
+          writeStream = fs.createWriteStream(file.path)
+          writeStream.on('error', onerror)
+          hashStream = blake3.createHash()
 
           if (utils.scan.passthrough &&
-          !self.scanHelpers.assertUserBypass(req._user, filename) &&
-          !self.scanHelpers.assertFileBypass({ filename })) {
+          !self.scanHelpers.assertUserBypass(req._user, file.filename) &&
+          !self.scanHelpers.assertFileBypass({ filename: file.filename })) {
             scanStream = utils.scan.instance.passthrough()
           }
         }
 
-        field.file.stream.on('error', onerror)
-        field.file.stream.on('data', d => hash.update(d))
+        readStream.on('error', onerror)
+        readStream.on('data', d => hashStream.update(d))
 
-        if (isChunk) {
-          field.file.stream.on('end', () => _resolve())
-          field.file.stream.pipe(outStream, { end: false })
+        if (file.isChunk) {
+          readStream.on('end', () => _resolve())
+          readStream.pipe(writeStream, { end: false })
         } else {
-          outStream.on('finish', () => _resolve({
-            size: outStream.bytesWritten,
-            hash: hash.digest('hex')
-          }, scanStream ? 1 : 2)
-          )
+          // Callback's weight is 1 when passthrough scanning is enabled,
+          // so that the Promise will be resolved only after
+          // both writeStream and scanStream finish
+          writeStream.on('finish', () => _resolve({
+            size: writeStream.bytesWritten,
+            hash: hashStream.digest('hex')
+          }, scanStream ? 1 : 2))
 
           if (scanStream) {
-            logger.debug(`[ClamAV]: ${filename}: Passthrough scanning\u2026`)
+            logger.debug(`[ClamAV]: ${file.filename}: Passthrough scanning\u2026`)
             scanStream.on('error', onerror)
             scanStream.on('scan-complete', scan => _resolve({ scan }, 1))
-            field.file.stream.pipe(scanStream).pipe(outStream)
+            readStream
+              .pipe(scanStream)
+              .pipe(writeStream)
           } else {
-            field.file.stream.pipe(outStream)
+            readStream
+              .pipe(writeStream)
           }
         }
       })
-
-      // Push file to Request.files array
-      req.files.push(file)
     } catch (error) {
-      multipartErrors.push(error)
+      multipartFieldErrors.push(error)
     }
   }).catch(error => {
     // res.multipart() itself may throw string errors
@@ -384,29 +389,29 @@ self.upload = async (req, res) => {
     }
   })
 
-  if (multipartErrors.length) {
-    for (let i = 1; i < multipartErrors.length; i++) {
-      if (multipartErrors[i] instanceof ClientError ||
-        multipartErrors[i] instanceof ServerError) {
+  if (multipartFieldErrors.length) {
+    for (let i = 1; i < multipartFieldErrors.length; i++) {
+      if (multipartFieldErrors[i] instanceof ClientError ||
+        multipartFieldErrors[i] instanceof ServerError) {
         continue
       }
       // Log additional errors to console if they are not generic ClientError or ServeError
-      logger.error(multipartErrors[i])
+      logger.error(multipartFieldErrors[i])
     }
     // Re-throw the first multipart error into global error handler
-    throw multipartErrors[0]
+    throw multipartFieldErrors[0]
   }
 
-  if (Array.isArray(req.files)) {
-    return self.actuallyUpload(req, res, user, albumid, age)
+  if (hasMultipartField) {
+    return self.actuallyUpload(req, res, user)
   } else {
     // Parse POST body
     req.body = await req.json()
-    return self.actuallyUploadUrls(req, res, user, albumid, age)
+    return self.actuallyUploadUrls(req, res, user, { albumid, age })
   }
 }
 
-self.actuallyUpload = async (req, res, user, albumid, age) => {
+self.actuallyUpload = async (req, res, user, data = {}) => {
   if (!req.files || !req.files.length) {
     throw new ClientError('No files.')
   }
@@ -420,20 +425,12 @@ self.actuallyUpload = async (req, res, user, albumid, age) => {
     return res.json({ success: true })
   }
 
-  const infoMap = req.files.map(file => {
-    file.albumid = albumid
-    file.age = age
-    return {
-      path: path.join(paths.uploads, file.filename),
-      data: file
-    }
-  })
-
-  if (config.filterEmptyFile && infoMap.some(file => file.data.size === 0)) {
+  const filesData = req.files
+  if (config.filterEmptyFile && filesData.some(file => file.size === 0)) {
     // Unlink all files when at least one file is an empty file
     // Should continue even when encountering errors
-    await Promise.all(infoMap.map(info =>
-      utils.unlinkFile(info.data.filename).catch(logger.error)
+    await Promise.all(filesData.map(file =>
+      utils.unlinkFile(file.filename).catch(logger.error)
     ))
 
     throw new ClientError('Empty files are not allowed.')
@@ -442,24 +439,24 @@ self.actuallyUpload = async (req, res, user, albumid, age) => {
   if (utils.scan.instance) {
     let scanResult
     if (utils.scan.passthrough) {
-      scanResult = await self.assertPassthroughScans(req, user, infoMap)
+      scanResult = await self.assertPassthroughScans(req, user, filesData)
     } else {
-      scanResult = await self.scanFiles(req, user, infoMap)
+      scanResult = await self.scanFiles(req, user, filesData)
     }
     if (scanResult) {
       throw new ClientError(scanResult)
     }
   }
 
-  await self.stripTags(req, infoMap)
+  await self.stripTags(req, filesData)
 
-  const result = await self.storeFilesToDb(req, res, user, infoMap)
+  const result = await self.storeFilesToDb(req, res, user, filesData)
   return self.sendUploadResponse(req, res, user, result)
 }
 
 /** URL uploads */
 
-self.actuallyUploadUrls = async (req, res, user, albumid, age) => {
+self.actuallyUploadUrls = async (req, res, user, data = {}) => {
   if (!config.uploads.urlMaxSize) {
     throw new ClientError('Upload by URLs is disabled at the moment.', { statusCode: 403 })
   }
@@ -486,23 +483,31 @@ self.actuallyUploadUrls = async (req, res, user, albumid, age) => {
   }
 
   const downloaded = []
-  const infoMap = []
+  const filesData = []
   await Promise.all(urls.map(async url => {
-    const original = path.basename(url).split(/[?#]/)[0]
-    const extname = utils.extname(original)
+    // Push immediately as we will only be adding props into the file object down the line
+    const file = {
+      url,
+      albumid: data.albumid,
+      age: data.age
+    }
+    filesData.push(file)
+
+    file.originalname = path.basename(url).split(/[?#]/)[0]
+    file.extname = utils.extname(file.originalname)
 
     // Extensions filter
     let filtered = false
     if (urlExtensionsFilter && ['blacklist', 'whitelist'].includes(config.uploads.urlExtensionsFilterMode)) {
-      const match = config.uploads.urlExtensionsFilter.includes(extname.toLowerCase())
+      const match = config.uploads.urlExtensionsFilter.includes(file.extname.toLowerCase())
       const whitelist = config.uploads.urlExtensionsFilterMode === 'whitelist'
       filtered = ((!whitelist && match) || (whitelist && !match))
     } else {
-      filtered = self.isExtensionFiltered(extname)
+      filtered = self.isExtensionFiltered(file.extname)
     }
 
     if (filtered) {
-      throw new ClientError(`${extname ? `${extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
+      throw new ClientError(`${file.extname ? `${file.extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
     }
 
     if (config.uploads.urlProxy) {
@@ -529,29 +534,28 @@ self.actuallyUploadUrls = async (req, res, user, albumid, age) => {
     }
 
     const length = self.parseFileIdentifierLength(req.headers.filelength)
-    const name = await self.getUniqueRandomName(length, extname)
+    file.filename = await self.getUniqueRandomName(length, file.extname)
+    file.path = path.join(paths.uploads, file.filename)
 
-    const destination = path.join(paths.uploads, name)
-
-    let outStream
-    let hasher
+    let writeStream
+    let hashStream
     return Promise.resolve().then(async () => {
-      outStream = fs.createWriteStream(destination)
-      hasher = blake3.createHash()
+      writeStream = fs.createWriteStream(file.path)
+      hashStream = blake3.createHash()
 
       // Push to array early, so regardless of its progress it will be deleted on errors
-      downloaded.push(destination)
+      downloaded.push(file.path)
 
       // Limit max response body size with maximum allowed size
       const fetchFile = await fetch(url, { method: 'GET', size: urlMaxSizeBytes })
         .then(res => new Promise((resolve, reject) => {
           if (res.status === 200) {
-            outStream.on('error', reject)
+            writeStream.on('error', reject)
             res.body.on('error', reject)
-            res.body.on('data', d => hasher.update(d))
+            res.body.on('data', d => hashStream.update(d))
 
-            res.body.pipe(outStream)
-            outStream.on('finish', () => resolve(res))
+            res.body.pipe(writeStream)
+            writeStream.on('finish', () => resolve(res))
           } else {
             resolve(res)
           }
@@ -561,31 +565,22 @@ self.actuallyUploadUrls = async (req, res, user, albumid, age) => {
         throw new ServerError(`${fetchFile.status} ${fetchFile.statusText}`)
       }
 
-      const contentType = fetchFile.headers.get('content-type')
       // Re-test size via actual bytes written to physical file
-      assertSize(outStream.bytesWritten)
+      assertSize(writeStream.bytesWritten)
 
-      infoMap.push({
-        path: destination,
-        data: {
-          filename: name,
-          originalname: original,
-          extname,
-          mimetype: contentType ? contentType.split(';')[0] : '',
-          size: outStream.bytesWritten,
-          hash: hasher.digest('hex'),
-          albumid,
-          age
-        }
-      })
+      // Finalize file props
+      const contentType = fetchFile.headers.get('content-type')
+      file.mimetype = contentType ? contentType.split(';')[0] : 'application/octet-stream'
+      file.size = writeStream.bytesWritten
+      file.hash = hashStream.digest('hex')
     }).catch(err => {
       // Dispose of unfinished write & hasher streams
-      if (outStream && !outStream.destroyed) {
-        outStream.destroy()
+      if (writeStream && !writeStream.destroyed) {
+        writeStream.destroy()
       }
       try {
-        if (hasher) {
-          hasher.dispose()
+        if (hashStream) {
+          hashStream.dispose()
         }
       } catch (_) {}
 
@@ -614,11 +609,11 @@ self.actuallyUploadUrls = async (req, res, user, albumid, age) => {
   })
 
   if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, user, infoMap)
+    const scanResult = await self.scanFiles(req, user, filesData)
     if (scanResult) throw new ClientError(scanResult)
   }
 
-  const result = await self.storeFilesToDb(req, res, user, infoMap)
+  const result = await self.storeFilesToDb(req, res, user, filesData)
   return self.sendUploadResponse(req, res, user, result)
 }
 
@@ -659,7 +654,7 @@ self.finishChunks = async (req, res) => {
 }
 
 self.actuallyFinishChunks = async (req, res, user, files) => {
-  const infoMap = []
+  const filesData = []
   await Promise.all(files.map(async file => {
     if (!file.uuid || typeof chunksData[file.uuid] === 'undefined') {
       throw new ClientError('Invalid file UUID, or chunks data had already timed out. Try again?')
@@ -670,8 +665,8 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
     chunksData[file.uuid].clearTimeout()
 
     // Conclude write and hasher streams
-    chunksData[file.uuid].stream.end()
-    const hash = chunksData[file.uuid].hasher.digest('hex')
+    chunksData[file.uuid].writeStream.end()
+    const hash = chunksData[file.uuid].hashStream.digest('hex')
 
     if (chunksData[file.uuid].chunks < 2 || chunksData[file.uuid].chunks > maxChunksCount) {
       throw new ClientError('Invalid chunks count.')
@@ -684,7 +679,7 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
 
     file.age = self.assertRetentionPeriod(user, file.age)
 
-    file.size = chunksData[file.uuid].stream.bytesWritten
+    file.size = chunksData[file.uuid].writeStream.bytesWritten
     if (config.filterEmptyFile && file.size === 0) {
       throw new ClientError('Empty files are not allowed.')
     } else if (file.size > maxSizeBytes) {
@@ -717,39 +712,38 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
     let albumid = parseInt(file.albumid)
     if (isNaN(albumid)) albumid = null
 
-    const data = {
+    filesData.push({
       filename: name,
       originalname: file.original || '',
       extname: file.extname,
       mimetype: file.type || '',
+      path: destination,
       size: file.size,
       hash,
       albumid,
       age: file.age
-    }
-
-    infoMap.push({ path: destination, data })
+    })
   }))
 
   if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, user, infoMap)
+    const scanResult = await self.scanFiles(req, user, filesData)
     if (scanResult) throw new ClientError(scanResult)
   }
 
-  await self.stripTags(req, infoMap)
+  await self.stripTags(req, filesData)
 
-  const result = await self.storeFilesToDb(req, res, user, infoMap)
+  const result = await self.storeFilesToDb(req, res, user, filesData)
   return self.sendUploadResponse(req, res, user, result)
 }
 
 self.cleanUpChunks = async uuid => {
   // Dispose of unfinished write & hasher streams
-  if (chunksData[uuid].stream && !chunksData[uuid].stream.destroyed) {
-    chunksData[uuid].stream.destroy()
+  if (chunksData[uuid].writeStream && !chunksData[uuid].writeStream.destroyed) {
+    chunksData[uuid].writeStream.destroy()
   }
   try {
-    if (chunksData[uuid].hasher) {
-      chunksData[uuid].hasher.dispose()
+    if (chunksData[uuid].hashStream) {
+      chunksData[uuid].hashStream.dispose()
     }
   } catch (_) {}
 
@@ -793,20 +787,20 @@ self.scanHelpers.assertFileBypass = data => {
   return false
 }
 
-self.assertPassthroughScans = async (req, user, infoMap) => {
+self.assertPassthroughScans = async (req, user, filesData) => {
   const foundThreats = []
   const unableToScan = []
 
-  for (const info of infoMap) {
-    if (info.data.scan) {
-      if (info.data.scan.isInfected) {
-        logger.log(`[ClamAV]: ${info.data.filename}: ${info.data.scan.viruses.join(', ')}`)
-        foundThreats.push(...info.data.scan.viruses)
-      } else if (info.data.scan.isInfected === null) {
-        logger.log(`[ClamAV]: ${info.data.filename}: Unable to scan`)
-        unableToScan.push(info.data.filename)
+  for (const file of filesData) {
+    if (file.scan) {
+      if (file.scan.isInfected) {
+        logger.log(`[ClamAV]: ${file.filename}: ${file.scan.viruses.join(', ')}`)
+        foundThreats.push(...file.scan.viruses)
+      } else if (file.scan.isInfected === null) {
+        logger.log(`[ClamAV]: ${file.filename}: Unable to scan`)
+        unableToScan.push(file.filename)
       } else {
-        logger.debug(`[ClamAV]: ${info.data.filename}: File is clean`)
+        logger.debug(`[ClamAV]: ${file.filename}: File is clean`)
       }
     }
   }
@@ -823,39 +817,39 @@ self.assertPassthroughScans = async (req, user, infoMap) => {
   if (result) {
     // Unlink all files when at least one threat is found
     // Should continue even when encountering errors
-    await Promise.all(infoMap.map(info =>
-      utils.unlinkFile(info.data.filename).catch(logger.error)
+    await Promise.all(filesData.map(file =>
+      utils.unlinkFile(file.filename).catch(logger.error)
     ))
   }
 
   return result
 }
 
-self.scanFiles = async (req, user, infoMap) => {
-  const filenames = infoMap.map(info => info.data.filename)
+self.scanFiles = async (req, user, filesData) => {
+  const filenames = filesData.map(file => file.filename)
   if (self.scanHelpers.assertUserBypass(user, filenames)) {
     return false
   }
 
   const foundThreats = []
   const unableToScan = []
-  const result = await Promise.all(infoMap.map(async info => {
+  const result = await Promise.all(filesData.map(async file => {
     if (self.scanHelpers.assertFileBypass({
-      filename: info.data.filename,
-      extname: info.data.extname,
-      size: info.data.size
+      filename: file.filename,
+      extname: file.extname,
+      size: file.size
     })) return
 
-    logger.debug(`[ClamAV]: ${info.data.filename}: Scanning\u2026`)
-    const response = await utils.scan.instance.isInfected(info.path)
+    logger.debug(`[ClamAV]: ${file.filename}: Scanning\u2026`)
+    const response = await utils.scan.instance.isInfected(file.path)
     if (response.isInfected) {
-      logger.log(`[ClamAV]: ${info.data.filename}: ${response.viruses.join(', ')}`)
+      logger.log(`[ClamAV]: ${file.filename}: ${response.viruses.join(', ')}`)
       foundThreats.push(...response.viruses)
     } else if (response.isInfected === null) {
-      logger.log(`[ClamAV]: ${info.data.filename}: Unable to scan`)
-      unableToScan.push(info.data.filename)
+      logger.log(`[ClamAV]: ${file.filename}: Unable to scan`)
+      unableToScan.push(file.filename)
     } else {
-      logger.debug(`[ClamAV]: ${info.data.filename}: File is clean`)
+      logger.debug(`[ClamAV]: ${file.filename}: File is clean`)
     }
   })).then(() => {
     if (foundThreats.length) {
@@ -873,8 +867,8 @@ self.scanFiles = async (req, user, infoMap) => {
   if (result) {
     // Unlink all files when at least one threat is found OR any errors occurred
     // Should continue even when encountering errors
-    await Promise.all(infoMap.map(info =>
-      utils.unlinkFile(info.data.filename).catch(logger.error)
+    await Promise.all(filesData.map(file =>
+      utils.unlinkFile(file.filename).catch(logger.error)
     ))
   }
 
@@ -883,18 +877,18 @@ self.scanFiles = async (req, user, infoMap) => {
 
 /** Strip tags (EXIF, etc.) */
 
-self.stripTags = async (req, infoMap) => {
+self.stripTags = async (req, filesData) => {
   if (!self.parseStripTags(req.headers.striptags)) return
 
   try {
-    await Promise.all(infoMap.map(info =>
-      utils.stripTags(info.data.filename, info.data.extname)
+    await Promise.all(filesData.map(file =>
+      utils.stripTags(file.filename, file.extname)
     ))
   } catch (error) {
     // Unlink all files when at least one threat is found OR any errors occurred
     // Should continue even when encountering errors
-    await Promise.all(infoMap.map(info =>
-      utils.unlinkFile(info.data.filename).catch(logger.error)
+    await Promise.all(filesData.map(file =>
+      utils.unlinkFile(file.filename).catch(logger.error)
     ))
 
     // Re-throw error
@@ -904,12 +898,12 @@ self.stripTags = async (req, infoMap) => {
 
 /** Database functions */
 
-self.storeFilesToDb = async (req, res, user, infoMap) => {
+self.storeFilesToDb = async (req, res, user, filesData) => {
   const files = []
   const exists = []
   const albumids = []
 
-  await Promise.all(infoMap.map(async info => {
+  await Promise.all(filesData.map(async file => {
     // Check if the file exists by checking its hash and size
     const dbFile = await utils.db.table('files')
       .where(function () {
@@ -920,8 +914,8 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
         }
       })
       .where({
-        hash: info.data.hash,
-        size: String(info.data.size)
+        hash: file.hash,
+        size: String(file.size)
       })
       // Select expirydate to display expiration date of existing files as well
       .select('name', 'expirydate')
@@ -929,12 +923,13 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
 
     if (dbFile) {
       // Continue even when encountering errors
-      await utils.unlinkFile(info.data.filename).catch(logger.error)
-      logger.debug(`Unlinked ${info.data.filename} since a duplicate named ${dbFile.name} exists`)
+      await utils.unlinkFile(file.filename).catch(logger.error)
+      logger.debug(`Unlinked ${file.filename} since a duplicate named ${dbFile.name} exists`)
 
-      // If on /nojs route, append original file name reported by client
+      // If on /nojs route, append original name reported by client,
+      // instead of the actual original name from database
       if (req.path === '/nojs') {
-        dbFile.original = info.data.originalname
+        dbFile.original = file.originalname
       }
 
       exists.push(dbFile)
@@ -943,11 +938,11 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
 
     const timestamp = Math.floor(Date.now() / 1000)
     const data = {
-      name: info.data.filename,
-      original: info.data.originalname,
-      type: info.data.mimetype,
-      size: String(info.data.size),
-      hash: info.data.hash,
+      name: file.filename,
+      original: file.originalname,
+      type: file.mimetype,
+      size: String(file.size),
+      hash: file.hash,
       // Only disable if explicitly set to false in config
       ip: config.uploads.storeIP !== false ? req.ip : null,
       timestamp
@@ -955,21 +950,21 @@ self.storeFilesToDb = async (req, res, user, infoMap) => {
 
     if (user) {
       data.userid = user.id
-      data.albumid = info.data.albumid
+      data.albumid = file.albumid
       if (data.albumid !== null && !albumids.includes(data.albumid)) {
         albumids.push(data.albumid)
       }
     }
 
-    if (info.data.age) {
-      data.expirydate = data.timestamp + (info.data.age * 3600) // Hours to seconds
+    if (file.age) {
+      data.expirydate = data.timestamp + (file.age * 3600) // Hours to seconds
     }
 
     files.push(data)
 
     // Generate thumbs, but do not wait
-    if (utils.mayGenerateThumb(info.data.extname)) {
-      utils.generateThumbs(info.data.filename, info.data.extname, true).catch(logger.error)
+    if (utils.mayGenerateThumb(file.extname)) {
+      utils.generateThumbs(file.filename, file.extname, true).catch(logger.error)
     }
   }))
 
