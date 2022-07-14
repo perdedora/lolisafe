@@ -225,38 +225,42 @@ const cloudflarePurgeCacheQueue = cloudflareAuth && fastq.promise(async chunk =>
       logger.log(`${prefix}: ${message}`)
     }
 
-    try {
-      const purge = await fetch(url, {
-        method: 'POST',
-        body: JSON.stringify({ files: chunk }),
-        headers
-      })
-      const response = await purge.json()
+    const response = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ files: chunk }),
+      headers
+    })
+      .then(res => res.json())
+      .catch(error => error)
 
-      const hasErrorsArray = Array.isArray(response.errors) && response.errors.length
-      if (hasErrorsArray) {
-        const rateLimit = response.errors.find(error => /rate limit/i.test(error.message))
-        if (rateLimit && i < MAX_TRIES - 1) {
-          _log(`${rateLimit.code}: ${rateLimit.message}. Retrying in a minute\u2026`)
-          await new Promise(resolve => setTimeout(resolve, 60000))
-          continue
-        }
-      }
-
-      result.success = response.success
-      result.errors = hasErrorsArray
-        ? response.errors.map(error => `${error.code}: ${error.message}`)
-        : []
-    } catch (error) {
-      const errorString = error.toString()
+    // If fetch errors out, instead of API responding with API errors
+    if (response instanceof Error) {
+      const errorString = response.toString()
       if (i < MAX_TRIES - 1) {
         _log(`${errorString}. Retrying in 5 seconds\u2026`)
         await new Promise(resolve => setTimeout(resolve, 5000))
         continue
       }
-
       result.errors = [errorString]
+      break
     }
+
+    // If API reponds with API errors
+    const hasErrorsArray = Array.isArray(response.errors) && response.errors.length
+    if (hasErrorsArray) {
+      const rateLimit = response.errors.find(error => /rate limit/i.test(error.message))
+      if (rateLimit && i < MAX_TRIES - 1) {
+        _log(`${rateLimit.code}: ${rateLimit.message}. Retrying in a minute\u2026`)
+        await new Promise(resolve => setTimeout(resolve, 60000))
+        continue
+      }
+    }
+
+    // If succeeds or out of retries
+    result.success = response.success
+    result.errors = hasErrorsArray
+      ? response.errors.map(error => `${error.code}: ${error.message}`)
+      : []
     break
   }
 
@@ -742,9 +746,10 @@ self.purgeCloudflareCache = async (names, uploads, thumbs) => {
   }
 
   const results = []
-  await Promise.all(chunks.map(async chunk =>
-    results.push(await cloudflarePurgeCacheQueue.push(chunk))
-  ))
+  for (const chunk of chunks) {
+    const result = await cloudflarePurgeCacheQueue.push(chunk)
+    results.push(result)
+  }
   return results
 }
 
