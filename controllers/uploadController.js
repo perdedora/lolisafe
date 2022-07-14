@@ -350,7 +350,13 @@ self.upload = async (req, res) => {
         }
 
         readStream.on('error', onerror)
-        readStream.on('data', d => hashStream.update(d))
+        readStream.on('data', d => {
+          // .dispose() will destroy this internal component,
+          // so use it as an indicator of whether the hashStream has been .dispose()'d
+          if (hashStream.hash.hash) {
+            hashStream.update(d)
+          }
+        })
 
         if (file.isChunk) {
           readStream.on('end', () => _resolve())
