@@ -169,11 +169,11 @@ code,
   color: $grey-light
 }
 
-.select:not(.is-multiple):not(.is-loading)::after {
+.select:not(.is-multiple,.is-loading)::after {
   border-color: $white-ter
 }
 
-.select:not(.is-multiple):not(.is-loading):hover::after {
+.select:not(.is-multiple,.is-loading):hover::after {
   border-color: $white-ter
 }
 

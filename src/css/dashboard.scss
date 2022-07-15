@@ -181,7 +181,7 @@ li[data-action="page-ellipsis"] {
     .button {
       border-radius: 0;
 
-      &:not(:active):not(:hover) {
+      &:not(:active,:hover) {
         color: $white;
         background-color: rgb(0 0 0 / 56%)
       }
