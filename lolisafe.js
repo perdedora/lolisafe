@@ -105,7 +105,7 @@ if (config.accessControlAllowOrigin) {
     config.accessControlAllowOrigin = '*'
   }
   safe.use((req, res, next) => {
-    res.set('Access-Control-Allow-Origin', config.accessControlAllowOrigin)
+    res.header('Access-Control-Allow-Origin', config.accessControlAllowOrigin)
     if (config.accessControlAllowOrigin !== '*') {
       res.vary('Origin')
     }
@@ -149,7 +149,7 @@ if (config.cacheControl) {
 
   // By default soft cache everything
   safe.use('/', (req, res, next) => {
-    res.set('Cache-Control', cacheControls.validate)
+    res.header('Cache-Control', cacheControls.validate)
     return next()
   })
 
@@ -162,7 +162,7 @@ if (config.cacheControl) {
         if (req.method === 'GET' || req.method === 'HEAD') {
           const page = req.path === '/' ? 'home' : req.path.substring(1)
           if (cdnPages.includes(page)) {
-            res.set('Cache-Control', cacheControls.cdn)
+            res.header('Cache-Control', cacheControls.cdn)
           }
         }
         return next()
@@ -174,16 +174,16 @@ if (config.cacheControl) {
   // This requires the assets to use version in their query string,
   // as they will be cached by clients for a very long time.
   setHeadersForStaticAssets = (req, res) => {
-    res.set('Cache-Control', cacheControls.static)
+    res.header('Cache-Control', cacheControls.static)
   }
 
   // Consider album ZIPs static as well, since they use version in their query string
   safe.use('/api/album/zip', (req, res, next) => {
     const versionString = parseInt(req.query.v)
     if (versionString > 0) {
-      res.set('Cache-Control', cacheControls.static)
+      res.header('Cache-Control', cacheControls.static)
     } else {
-      res.set('Cache-Control', cacheControls.disable)
+      res.header('Cache-Control', cacheControls.disable)
     }
     return next()
   })

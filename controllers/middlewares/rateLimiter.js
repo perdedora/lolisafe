@@ -38,10 +38,10 @@ class RateLimiter {
     await this.rateLimiterMemory.consume(key, 1)
       .then(result => {
         res.locals.rateLimit = result
-        res.set('Retry-After', String(result.msBeforeNext / 1000))
-        res.set('X-RateLimit-Limit', String(this.rateLimiterMemory._points))
-        res.set('X-RateLimit-Remaining', String(result.remainingPoints))
-        res.set('X-RateLimit-Reset', String(new Date(Date.now() + result.msBeforeNext)))
+        res.header('Retry-After', String(result.msBeforeNext / 1000))
+        res.header('X-RateLimit-Limit', String(this.rateLimiterMemory._points))
+        res.header('X-RateLimit-Remaining', String(result.remainingPoints))
+        res.header('X-RateLimit-Reset', String(new Date(Date.now() + result.msBeforeNext)))
       })
       .catch(reject => {
         // Re-throw with ClientError

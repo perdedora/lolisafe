@@ -44,7 +44,7 @@ self.handleError = (req, res, error) => {
     json.code = error.code
   }
 
-  res.setHeader('Cache-Control', 'no-store')
+  res.header('Cache-Control', 'no-store')
 
   if (Object.keys(json).length) {
     json.success = false
@@ -59,7 +59,7 @@ self.handleError = (req, res, error) => {
 }
 
 self.handleNotFound = (req, res) => {
-  res.setHeader('Cache-Control', 'no-store')
+  res.header('Cache-Control', 'no-store')
   return res.status(404).sendFile(path.join(paths.errorRoot, config.errorPages[404]))
 }
 
