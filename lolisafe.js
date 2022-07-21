@@ -48,7 +48,7 @@ const ExpressCompat = require('./controllers/middlewares/expressCompat')
 const NunjucksRenderer = require('./controllers/middlewares/nunjucksRenderer')
 const RateLimiter = require('./controllers/middlewares/rateLimiter')
 const ServeLiveDirectory = require('./controllers/middlewares/serveLiveDirectory')
-// const ServeStatic = require('./controllers/middlewares/serveStatic') // TODO
+const ServeStatic = require('./controllers/middlewares/serveStatic')
 
 // Routes
 const album = require('./routes/album')
@@ -269,20 +269,18 @@ safe.use('/api', api)
     })
 
     // Init ServerStatic last if serving uploaded files with node
-    /* // TODO
     if (config.serveFilesWithNode) {
       const serveStaticInstance = new ServeStatic(paths.uploads, {
         contentDispositionOptions: config.contentDispositionOptions,
+        ignorePatterns: [
+          '/chunks/'
+        ],
         overrideContentTypes: config.overrideContentTypes,
         setContentDisposition: config.setContentDisposition
       })
-      safe.use('/', serveStaticInstance.middleware)
+      safe.get('/*', serveStaticInstance.middleware)
+      safe.head('/*', serveStaticInstance.middleware)
       utils.contentDispositionStore = serveStaticInstance.contentDispositionStore
-    }
-    */
-    if (config.serveFilesWithNode) {
-      logger.error('Serving files with node is currently not available in this branch.')
-      return process.exit(1)
     }
 
     // Web server error handlers (must always be set after all routes/middlewares)

@@ -1,77 +1,18 @@
-const self = {}
+const fresh = require('fresh')
 
-/*
-* https://github.com/jshttp/fresh/blob/v0.5.2/index.js
-* Copyright(c) 2012 TJ Holowaychuk
-* Copyright(c) 2016-2017 Douglas Christopher Wilson
-* MIT Licensed
-*/
-
-const CACHE_CONTROL_NO_CACHE_REGEXP = /(?:^|,)\s*?no-cache\s*?(?:,|$)/
-
-self.fresh = (reqHeaders, resHeaders) => {
-  // fields
-  const modifiedSince = reqHeaders['if-modified-since']
-  const noneMatch = reqHeaders['if-none-match']
-
-  // unconditional request
-  if (!modifiedSince && !noneMatch) {
-    return false
-  }
-
-  // Always return stale when Cache-Control: no-cache
-  // to support end-to-end reload requests
-  // https://tools.ietf.org/html/rfc2616#section-14.9.4
-  const cacheControl = reqHeaders['cache-control']
-  if (cacheControl && CACHE_CONTROL_NO_CACHE_REGEXP.test(cacheControl)) {
-    return false
-  }
-
-  // if-none-match
-  if (noneMatch && noneMatch !== '*') {
-    const etag = resHeaders.etag
-
-    if (!etag) {
-      return false
-    }
-
-    let etagStale = true
-    const matches = self.parseTokenList(noneMatch)
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i]
-      if (match === etag || match === 'W/' + etag || 'W/' + match === etag) {
-        etagStale = false
-        break
-      }
-    }
-
-    if (etagStale) {
-      return false
-    }
-  }
-
-  // if-modified-since
-  if (modifiedSince) {
-    const lastModified = resHeaders['last-modified']
-    const modifiedStale = !lastModified || !(self.parseHttpDate(lastModified) <= self.parseHttpDate(modifiedSince))
-
-    if (modifiedStale) {
-      return false
-    }
-  }
-
-  return true
+const self = {
+  BYTES_RANGE_REGEXP: /^ *bytes=/
 }
 
 self.isFresh = (req, res) => {
-  return self.fresh(req.headers, {
+  return fresh(req.headers, {
     etag: res.get('ETag'),
     'last-modified': res.get('Last-Modified')
   })
 }
 
 /*
- * https://github.com/pillarjs/send/blob/0.18.0/index.js
+ * Based on https://github.com/pillarjs/send/blob/0.18.0/index.js
  * Copyright(c) 2012 TJ Holowaychuk
  * Copyright(c) 2014-2022 Douglas Christopher Wilson
  * MIT Licensed
@@ -122,27 +63,9 @@ self.isPreconditionFailure = (req, res) => {
   return false
 }
 
-/*
-// TODO: ServeStatic may need these, but ServeLiveDirectory does its own (since it does not need Accept-Ranges support)
-self.setHeader = (res, path, stat) => {
-  if (this._acceptRanges && !res.get('Accept-Ranges')) {
-    logger.debug('accept ranges')
-    res.header('Accept-Ranges', 'bytes')
-  }
-
-  if (this._lastModified && !res.get('Last-Modified')) {
-    const modified = stat.mtime.toUTCString()
-    logger.debug('modified %s', modified)
-    res.header('Last-Modified', modified)
-  }
-
-  if (this._etag && !res.get('ETag')) {
-    const val = etag(stat)
-    logger.debug('etag %s', val)
-    res.header('ETag', val)
-  }
+self.contentRange = (type, size, range) => {
+  return type + ' ' + (range ? range.start + '-' + range.end : '*') + '/' + size
 }
-*/
 
 self.parseHttpDate = date => {
   const timestamp = date && Date.parse(date)
