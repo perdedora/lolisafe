@@ -363,7 +363,7 @@ self.listUsers = async (req, res) => {
     return res.json({ success: true, users: [], count })
   }
 
-  let offset = Number(req.params.page)
+  let offset = Number(req.path_parameters.page)
   if (isNaN(offset)) offset = 0
   else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
 

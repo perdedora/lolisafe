@@ -106,7 +106,7 @@ self.list = async (req, res) => {
 
     return res.json({ success: true, albums, count })
   } else {
-    let offset = Number(req.params.page)
+    let offset = Number(req.path_parameters.page)
     if (isNaN(offset)) offset = 0
     else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
 
@@ -431,7 +431,7 @@ self.rename = async (req, res) => {
 }
 
 self.get = async (req, res) => {
-  const identifier = req.params.identifier
+  const identifier = req.path_parameters.identifier
   if (identifier === undefined) {
     throw new ClientError('No identifier provided.')
   }
@@ -454,7 +454,7 @@ self.get = async (req, res) => {
     .orderBy('id', 'desc')
 
   for (const file of files) {
-    if (req._upstreamCompat) {
+    if (req.locals.upstreamCompat) {
       file.url = `${utils.conf.domain}/${file.name}`
     } else {
       file.file = `${utils.conf.domain}/${file.name}`
@@ -463,7 +463,9 @@ self.get = async (req, res) => {
     const extname = utils.extname(file.name)
     if (utils.mayGenerateThumb(extname)) {
       file.thumb = `${utils.conf.domain}/thumbs/${file.name.slice(0, -extname.length)}.png`
-      if (req._upstreamCompat) file.thumbSquare = file.thumb
+      if (req.locals.upstreamCompat) {
+        file.thumbSquare = file.thumb
+      }
     }
   }
 
@@ -477,10 +479,42 @@ self.get = async (req, res) => {
   })
 }
 
+self.getUpstreamCompat = async (req, res) => {
+  // If requested via /api/album/:identifier,
+  // map to .get() with chibisafe/upstream compatibility
+  // This API is known to be used in Pitu/Magane
+  req.locals.upstreamCompat = true
+  res._json = res.json
+  res.json = (body = {}) => {
+    // Rebuild JSON payload to match lolisafe upstream
+    const rebuild = {}
+    const maps = {
+      success: null,
+      description: 'message',
+      title: 'name',
+      download: 'downloadEnabled',
+      count: null
+    }
+
+    Object.keys(body).forEach(key => {
+      if (maps[key] !== undefined) {
+        if (maps[key]) rebuild[maps[key]] = body[key]
+      } else {
+        rebuild[key] = body[key]
+      }
+    })
+
+    if (rebuild.message) rebuild.message = rebuild.message.replace(/\.$/, '')
+    return res._json(rebuild)
+  }
+
+  return self.get(req, res)
+}
+
 self.generateZip = async (req, res) => {
   const versionString = parseInt(req.query.v)
 
-  const identifier = req.params.identifier
+  const identifier = req.path_parameters.identifier
   if (identifier === undefined) {
     throw new ClientError('No identifier provided.')
   }
@@ -591,42 +625,6 @@ self.generateZip = async (req, res) => {
 
   self.zipEmitters.get(identifier).emit('done', filePath, fileName)
   return res.download(filePath, fileName)
-}
-
-self.listFiles = async (req, res) => {
-  if (req.params.page === undefined) {
-    // Map to /api/album/get, but with lolisafe upstream compatibility, when accessed with this API route
-    req.params.identifier = req.params.id
-    delete req.params.id
-
-    req._upstreamCompat = true
-    res._json = res.json
-    res.json = (body = {}) => {
-      // Rebuild JSON payload to match lolisafe upstream
-      const rebuild = {}
-      const maps = {
-        success: null,
-        description: 'message',
-        title: 'name',
-        download: 'downloadEnabled',
-        count: null
-      }
-
-      Object.keys(body).forEach(key => {
-        if (maps[key] !== undefined) {
-          if (maps[key]) rebuild[maps[key]] = body[key]
-        } else {
-          rebuild[key] = body[key]
-        }
-      })
-
-      if (rebuild.message) rebuild.message = rebuild.message.replace(/\.$/, '')
-      return res._json(rebuild)
-    }
-    return self.get(req, res)
-  } else {
-    return uploadController.list(req, res)
-  }
 }
 
 self.addFiles = async (req, res) => {

@@ -210,7 +210,7 @@ self.upload = async (req, res) => {
     }
   }
 
-  let albumid = parseInt(req.headers.albumid || req.params.albumid)
+  let albumid = parseInt(req.headers.albumid || req.path_parameters.albumid)
   if (isNaN(albumid)) albumid = null
 
   const age = self.assertRetentionPeriod(user, req.headers.age)
@@ -1161,7 +1161,9 @@ self.list = async (req, res) => {
   if (filters) {
     const keywords = []
 
-    if (req.params.id === undefined) keywords.push('albumid')
+    if (req.path_parameters.albumid === undefined) {
+      keywords.push('albumid')
+    }
 
     // Only allow filtering by 'ip' and 'user' keys when listing all uploads
     if (all) keywords.push('ip', 'user')
@@ -1360,10 +1362,14 @@ self.list = async (req, res) => {
       ]
 
       // Only allow sorting by 'albumid' when not listing album's uploads
-      if (req.params.id === undefined) allowed.push('albumid')
+      if (req.path_parameters.albumid === undefined) {
+        allowed.push('albumid')
+      }
 
       // Only allow sorting by 'ip' and 'userid' columns when listing all uploads
-      if (all) allowed.push('ip', 'userid')
+      if (all) {
+        allowed.push('ip', 'userid')
+      }
 
       for (const obQuery of filterObj.queries.sort) {
         const tmp = obQuery.toLowerCase().split(':')
@@ -1468,7 +1474,7 @@ self.list = async (req, res) => {
 
     // Then, refine using any of the supplied 'albumid' keys and/or NULL flag
     // Same prioritization logic as 'userid' and 'ip' above
-    if (req.params.id === undefined) {
+    if (req.path_parameters.albumid === undefined) {
       this.andWhere(function () {
         if (filterObj.queries.exclude.albumid) {
           this.whereNotIn('albumid', filterObj.queries.exclude.albumid)
@@ -1486,7 +1492,7 @@ self.list = async (req, res) => {
       })
     } else if (!all) {
       // If not listing all uploads, list uploads from user's album
-      this.andWhere('albumid', req.params.id)
+      this.andWhere('albumid', req.path_parameters.albumid)
     }
 
     // Then, refine using the supplied 'date' ranges
@@ -1566,7 +1572,7 @@ self.list = async (req, res) => {
     return res.json({ success: true, files: [], count })
   }
 
-  let offset = Number(req.params.page)
+  let offset = Number(req.path_parameters.page)
   if (isNaN(offset)) offset = 0
   else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
 
@@ -1674,7 +1680,7 @@ self.get = async (req, res) => {
   const user = await utils.authorize(req)
   const ismoderator = perms.is(user, 'moderator')
 
-  const identifier = req.params.identifier
+  const identifier = req.path_parameters.identifier
   if (identifier === undefined) {
     throw new ClientError('No identifier provided.')
   }
