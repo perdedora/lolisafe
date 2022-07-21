@@ -16,12 +16,27 @@ class ServeLiveDirectory {
 
     this.instance = new LiveDirectory(instanceOptions)
 
+    if (options.etag === undefined) {
+      options.etag = true
+    }
+
+    if (options.lastModified === undefined) {
+      options.lastModified = true
+    }
+
     if (options.setHeaders && typeof options.setHeaders !== 'function') {
       throw new TypeError('Middleware option setHeaders must be a function')
     }
 
     this.#options = options
   }
+
+  /*
+   * Based on https://github.com/pillarjs/send/blob/0.18.0/index.js
+   * Copyright(c) 2012 TJ Holowaychuk
+   * Copyright(c) 2014-2022 Douglas Christopher Wilson
+   * MIT Licensed
+   */
 
   #middleware (req, res, next) {
     // Only process GET and HEAD requests
@@ -66,12 +81,12 @@ class ServeLiveDirectory {
       this.#options.setHeaders(req, res)
     }
 
-    if (!res.get('Last-Modified')) {
+    if (this.#options.lastModified && !res.get('Last-Modified')) {
       const modified = new Date(file.last_update).toUTCString()
       res.header('Last-Modified', modified)
     }
 
-    if (!res.get('ETag')) {
+    if (this.#options.etag && !res.get('ETag')) {
       const val = file.etag
       res.header('ETag', val)
     }
