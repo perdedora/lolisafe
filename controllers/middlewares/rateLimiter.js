@@ -22,7 +22,7 @@ class RateLimiter {
     this.rateLimiterMemory = new RateLimiterMemory(options)
   }
 
-  async #middleware (req, res, next) {
+  async #middleware (req, res) {
     if (res.locals.rateLimit) return
 
     // If unset, assume points pool is shared to all visitors of each route
