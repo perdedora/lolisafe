@@ -38,17 +38,7 @@ class ServeLiveDirectory {
    * MIT Licensed
    */
 
-  #middleware (req, res, next) {
-    // Only process GET and HEAD requests
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      return next()
-    }
-
-    const file = this.instance.get(req.path)
-    if (file === undefined) {
-      return next()
-    }
-
+  handler (req, res, file) {
     // set header fields
     this.#setHeaders(req, res, file)
 
@@ -72,6 +62,20 @@ class ServeLiveDirectory {
     }
 
     return res.send(file.buffer)
+  }
+
+  #middleware (req, res, next) {
+    // Only process GET and HEAD requests
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      return next()
+    }
+
+    const file = this.instance.get(req.path)
+    if (file === undefined) {
+      return next()
+    }
+
+    return this.handler(req, res, file)
   }
 
   #setHeaders (req, res, file) {

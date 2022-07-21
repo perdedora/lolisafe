@@ -232,13 +232,9 @@ safe.use('/api', api)
       }
     }
 
-    const liveDirectoryCustomPages = new LiveDirectory({
+    const serveLiveDirectoryCustomPagesInstance = new ServeLiveDirectory({
       path: paths.customPages,
-      keep: ['.html'],
-      ignore: path => {
-        // ignore dot files
-        return path.startsWith('.')
-      }
+      keep: ['.html']
     })
 
     // Cookie Policy
@@ -254,10 +250,9 @@ safe.use('/api', api)
     safe.use((req, res, next) => {
       if (req.method === 'GET' || req.method === 'HEAD') {
         const page = req.path === '/' ? 'home' : req.path.substring(1)
-        const customPage = liveDirectoryCustomPages.get(`${page}.html`)
+        const customPage = serveLiveDirectoryCustomPagesInstance.instance.get(`${page}.html`)
         if (customPage) {
-          // TODO: Conditional GETs? (e.g. Last-Modified, etag, etc.)
-          return res.type('html').send(customPage.buffer)
+          return serveLiveDirectoryCustomPagesInstance.handler(req, res, customPage)
         } else if (config.pages.includes(page)) {
           // These rendered pages are persistently cached during production
           return res.render(page, {
