@@ -37,13 +37,11 @@ routes.post('/upload', uploadController.upload, {
   // https://github.com/kartikk221/hyper-express/blob/6.2.4/docs/Server.md#server-constructor-options
   max_body_length: parseInt(config.uploads.maxSize) * 1e6
 })
-routes.post('/uploadurls', uploadController.uploadUrls)
 routes.post('/upload/delete', uploadController.delete)
 routes.post('/upload/bulkdelete', uploadController.bulkDelete)
 routes.post('/upload/finishchunks', uploadController.finishChunks)
 routes.get('/upload/get/:identifier', uploadController.get)
 routes.post('/upload/:albumid', uploadController.upload)
-routes.post('/uploadurls/:albumid', uploadController.uploadUrls)
 routes.get('/album/get/:identifier', albumsController.get)
 routes.get('/album/zip/:identifier', albumsController.generateZip)
 routes.get('/album/:id', albumsController.listFiles)
