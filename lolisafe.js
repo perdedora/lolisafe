@@ -44,8 +44,10 @@ paths.initSync()
 const utils = require('./controllers/utilsController')
 
 // Custom middlewares
+const ExpressCompat = require('./controllers/middlewares/expressCompat')
 const NunjucksRenderer = require('./controllers/middlewares/nunjucksRenderer')
 const RateLimiter = require('./controllers/middlewares/rateLimiter')
+const ServeLiveDirectory = require('./controllers/middlewares/serveLiveDirectory')
 // const ServeStatic = require('./controllers/middlewares/serveStatic') // TODO
 
 // Routes
@@ -56,6 +58,10 @@ const nojs = require('./routes/nojs')
 const player = require('./routes/player')
 
 const isDevMode = process.env.NODE_ENV === 'development'
+
+// Express-compat
+const expressCompatInstance = new ExpressCompat()
+safe.use(expressCompatInstance.middleware)
 
 // Rate limiters
 if (Array.isArray(config.rateLimiters)) {
@@ -119,17 +125,9 @@ const nunjucksRendererInstance = new NunjucksRenderer('views', {
 })
 safe.use('/', nunjucksRendererInstance.middleware)
 
-const initLiveDirectory = (options = {}) => {
-  if (!options.ignore) {
-    options.ignore = path => {
-      // ignore dot files
-      return path.startsWith('.')
-    }
-  }
-  return new LiveDirectory(options)
-}
-
-const cdnPages = [...config.pages]
+// Array of routes to apply CDN Cache-Control onto,
+// and additionally call Cloudflare API to have their CDN caches purged when lolisafe starts
+const cdnRoutes = [...config.pages]
 
 // Defaults to no-op
 let setHeadersForStaticAssets = () => {}
@@ -156,12 +154,14 @@ if (config.cacheControl) {
   switch (config.cacheControl) {
     case 1:
     case true:
-      // If using CDN, cache public pages in CDN
-      cdnPages.push('api/check')
+      // If using CDN, cache most front-end pages in CDN
+      // Include /api/check since it will only reply with persistent JSON payload
+      // that will not change, unless config file is edited and lolisafe is then restarted
+      cdnRoutes.push('api/check')
       safe.use((req, res, next) => {
         if (req.method === 'GET' || req.method === 'HEAD') {
           const page = req.path === '/' ? 'home' : req.path.substring(1)
-          if (cdnPages.includes(page)) {
+          if (cdnRoutes.includes(page)) {
             res.header('Cache-Control', cacheControls.cdn)
           }
         }
@@ -190,23 +190,16 @@ if (config.cacheControl) {
 }
 
 // Static assets
-const liveDirectoryPublic = initLiveDirectory({ path: paths.public })
-const liveDirectoryDist = initLiveDirectory({ path: paths.dist })
-safe.use('/', (req, res, next) => {
-  // Only process GET and HEAD requests
-  if (req.method === 'GET' || req.method === 'HEAD') {
-    // Try to find asset from public directory, then dist directory
-    const file =
-      liveDirectoryPublic.get(req.path) ||
-      liveDirectoryDist.get(req.path)
-    if (file === undefined) {
-      return next()
-    }
-    setHeadersForStaticAssets(req, res)
-    return res.type(file.extension).send(file.buffer)
-  }
-  return next()
-})
+const serveLiveDirectoryPublicInstance = new ServeLiveDirectory(
+  { path: paths.public },
+  { setHeaders: setHeadersForStaticAssets }
+)
+safe.use('/', serveLiveDirectoryPublicInstance.middleware)
+const serveLiveDirectoryDistInstance = new ServeLiveDirectory(
+  { path: paths.dist },
+  { setHeaders: setHeadersForStaticAssets }
+)
+safe.use('/', serveLiveDirectoryDistInstance.middleware)
 
 // Routes
 safe.use('/', album)
@@ -239,9 +232,13 @@ safe.use('/api', api)
       }
     }
 
-    const liveDirectoryCustomPages = initLiveDirectory({
+    const liveDirectoryCustomPages = new LiveDirectory({
       path: paths.customPages,
-      keep: ['.html']
+      keep: ['.html'],
+      ignore: path => {
+        // ignore dot files
+        return path.startsWith('.')
+      }
     })
 
     // Cookie Policy
@@ -259,6 +256,7 @@ safe.use('/api', api)
         const page = req.path === '/' ? 'home' : req.path.substring(1)
         const customPage = liveDirectoryCustomPages.get(`${page}.html`)
         if (customPage) {
+          // TODO: Conditional GETs? (e.g. Last-Modified, etag, etc.)
           return res.type('html').send(customPage.buffer)
         } else if (config.pages.includes(page)) {
           // These rendered pages are persistently cached during production
@@ -332,7 +330,7 @@ safe.use('/api', api)
     if (config.cacheControl && config.cacheControl !== 2) {
       if (config.cloudflare.purgeCache) {
         logger.log('Cache control enabled, purging Cloudflare\'s cache...')
-        const results = await utils.purgeCloudflareCache(cdnPages)
+        const results = await utils.purgeCloudflareCache(cdnRoutes)
         let errored = false
         let succeeded = 0
         for (const result of results) {
