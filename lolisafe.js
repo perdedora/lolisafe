@@ -189,16 +189,16 @@ if (config.cacheControl) {
   })
 }
 
-// Static assets
-const serveLiveDirectoryPublicInstance = new ServeLiveDirectory(
-  { path: paths.public },
-  { setHeaders: setHeadersForStaticAssets }
-)
+// Init LiveDirectory middlewares for static assets
+// Static assets in /public directory
+const serveLiveDirectoryPublicInstance = new ServeLiveDirectory({ path: paths.public }, {
+  setHeaders: setHeadersForStaticAssets
+})
 safe.use(serveLiveDirectoryPublicInstance.middleware)
-const serveLiveDirectoryDistInstance = new ServeLiveDirectory(
-  { path: paths.dist },
-  { setHeaders: setHeadersForStaticAssets }
-)
+// Static assets in /dist directory
+const serveLiveDirectoryDistInstance = new ServeLiveDirectory({ path: paths.dist }, {
+  setHeaders: setHeadersForStaticAssets
+})
 safe.use(serveLiveDirectoryDistInstance.middleware)
 
 // Routes
