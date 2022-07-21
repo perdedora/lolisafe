@@ -219,7 +219,8 @@ self.upload = async (req, res) => {
   req.body = {}
 
   // Initially try to parse as multipart
-  let hasMultipartField = true
+  // TODO: Check Request's Content-Type instead of always trying to parse as multipart
+  let hasMultipartField = false
 
   const unlinkFiles = async files => {
     return Promise.all(files.map(async file => {
