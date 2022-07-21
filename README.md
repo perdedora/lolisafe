@@ -61,7 +61,7 @@ When running in production mode, the safe will use pre-built client-side CSS/JS 
 
 The pre-built files are processed with [postcss-preset-env](https://github.com/csstools/postcss-preset-env), [cssnano](https://github.com/cssnano/cssnano), [bublé](https://github.com/bublejs/buble), and [terser](https://github.com/terser/terser), and done automatically with [GitHub Actions](https://github.com/BobbyWibowo/lolisafe/blob/safe.fiery.me/.github/workflows/build.yml).
 
-> If you want to this on Docker, please check out [docker directory](https://github.com/BobbyWibowo/lolisafe/tree/safe.fiery.me/docker).
+> If you want to use this on Docker, please check out [docker directory](https://github.com/BobbyWibowo/lolisafe/tree/safe.fiery.me/docker).
 
 ## Running in development mode
 
