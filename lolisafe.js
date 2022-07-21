@@ -123,7 +123,7 @@ if (config.accessControlAllowOrigin) {
 const nunjucksRendererInstance = new NunjucksRenderer('views', {
   watch: isDevMode
 })
-safe.use('/', nunjucksRendererInstance.middleware)
+safe.use(nunjucksRendererInstance.middleware)
 
 // Array of routes to apply CDN Cache-Control onto,
 // and additionally call Cloudflare API to have their CDN caches purged when lolisafe starts
@@ -146,7 +146,7 @@ if (config.cacheControl) {
   }
 
   // By default soft cache everything
-  safe.use('/', (req, res, next) => {
+  safe.use((req, res, next) => {
     res.header('Cache-Control', cacheControls.validate)
     return next()
   })
@@ -194,18 +194,18 @@ const serveLiveDirectoryPublicInstance = new ServeLiveDirectory(
   { path: paths.public },
   { setHeaders: setHeadersForStaticAssets }
 )
-safe.use('/', serveLiveDirectoryPublicInstance.middleware)
+safe.use(serveLiveDirectoryPublicInstance.middleware)
 const serveLiveDirectoryDistInstance = new ServeLiveDirectory(
   { path: paths.dist },
   { setHeaders: setHeadersForStaticAssets }
 )
-safe.use('/', serveLiveDirectoryDistInstance.middleware)
+safe.use(serveLiveDirectoryDistInstance.middleware)
 
 // Routes
-safe.use('/', album)
-safe.use('/', file)
-safe.use('/', nojs)
-safe.use('/', player)
+safe.use(album)
+safe.use(file)
+safe.use(nojs)
+safe.use(player)
 safe.use('/api', api)
 
 ;(async () => {
