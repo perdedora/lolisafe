@@ -210,7 +210,7 @@ self.upload = async (req, res) => {
     }
   }
 
-  let albumid = parseInt(req.headers.albumid || req.path_parameters.albumid)
+  let albumid = parseInt(req.headers.albumid || (req.path_parameters && req.path_parameters.albumid))
   if (isNaN(albumid)) albumid = null
 
   const age = self.assertRetentionPeriod(user, req.headers.age)
@@ -1090,6 +1090,7 @@ self.list = async (req, res) => {
   const ismoderator = perms.is(user, 'moderator')
   if (all && !ismoderator) return res.status(403).end()
 
+  const albumid = req.path_parameters && Number(req.path_parameters.albumid)
   const basedomain = utils.conf.domain
 
   // Thresholds for regular users
@@ -1161,12 +1162,15 @@ self.list = async (req, res) => {
   if (filters) {
     const keywords = []
 
-    if (req.path_parameters.albumid === undefined) {
+    // Only allow filtering by 'albumid' when not listing a specific album's uploads
+    if (isNaN(albumid)) {
       keywords.push('albumid')
     }
 
     // Only allow filtering by 'ip' and 'user' keys when listing all uploads
-    if (all) keywords.push('ip', 'user')
+    if (all) {
+      keywords.push('ip', 'user')
+    }
 
     const ranges = [
       'date',
@@ -1361,8 +1365,8 @@ self.list = async (req, res) => {
         'timestamp'
       ]
 
-      // Only allow sorting by 'albumid' when not listing album's uploads
-      if (req.path_parameters.albumid === undefined) {
+      // Only allow sorting by 'albumid' when not listing a specific album's uploads
+      if (isNaN(albumid)) {
         allowed.push('albumid')
       }
 
@@ -1474,7 +1478,7 @@ self.list = async (req, res) => {
 
     // Then, refine using any of the supplied 'albumid' keys and/or NULL flag
     // Same prioritization logic as 'userid' and 'ip' above
-    if (req.path_parameters.albumid === undefined) {
+    if (isNaN(albumid)) {
       this.andWhere(function () {
         if (filterObj.queries.exclude.albumid) {
           this.whereNotIn('albumid', filterObj.queries.exclude.albumid)
@@ -1572,7 +1576,7 @@ self.list = async (req, res) => {
     return res.json({ success: true, files: [], count })
   }
 
-  let offset = Number(req.path_parameters.page)
+  let offset = req.path_parameters && Number(req.path_parameters.page)
   if (isNaN(offset)) offset = 0
   else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
 
@@ -1680,7 +1684,7 @@ self.get = async (req, res) => {
   const user = await utils.authorize(req)
   const ismoderator = perms.is(user, 'moderator')
 
-  const identifier = req.path_parameters.identifier
+  const identifier = req.path_parameters && req.path_parameters.identifier
   if (identifier === undefined) {
     throw new ClientError('No identifier provided.')
   }

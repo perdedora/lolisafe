@@ -105,7 +105,7 @@ self.list = async (req, res) => {
 
     return res.json({ success: true, albums, count })
   } else {
-    let offset = Number(req.path_parameters.page)
+    let offset = req.path_parameters && Number(req.path_parameters.page)
     if (isNaN(offset)) offset = 0
     else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
 
@@ -430,7 +430,7 @@ self.rename = async (req, res) => {
 }
 
 self.get = async (req, res) => {
-  const identifier = req.path_parameters.identifier
+  const identifier = req.path_parameters && req.path_parameters.identifier
   if (identifier === undefined) {
     throw new ClientError('No identifier provided.')
   }
@@ -513,7 +513,7 @@ self.getUpstreamCompat = async (req, res) => {
 self.generateZip = async (req, res) => {
   const versionString = parseInt(req.query_parameters.v)
 
-  const identifier = req.path_parameters.identifier
+  const identifier = req.path_parameters && req.path_parameters.identifier
   if (identifier === undefined) {
     throw new ClientError('No identifier provided.')
   }

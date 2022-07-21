@@ -6,7 +6,7 @@ const utils = require('./../controllers/utilsController')
 const config = require('./../config')
 
 routes.get('/a/:identifier', async (req, res) => {
-  const identifier = req.path_parameters.identifier
+  const identifier = req.path_parameters && req.path_parameters.identifier
   if (identifier === undefined) {
     return errors.handleNotFound(req, res)
   }
