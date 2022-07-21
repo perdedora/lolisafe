@@ -15,6 +15,7 @@
 * Front-end pages templating with [Nunjucks](https://mozilla.github.io/nunjucks/).
 * A more integrated Cloudflare support (automatically purge files remote cache upon deletion, and more).
 * Chunked uploads to support 100MB+ files when hosted behind Cloudflare, or any other proxies with file upload size limits.
+* Upload remote URLs (have the service download those remote files for you).
 * Performant rate limits powered by [rate-limiter-flexible](https://github.com/animir/node-rate-limiter-flexible).
 * Albums with shareable pretty public pages.
 * User dashboard to manage own uploads and albums.
@@ -25,7 +26,7 @@
 * Strip images EXIF tags if required (can be set to be toggleable by users, and with experimental support for stripping videos tags as well).
 * Various options configurable via header tags upon file uploads (selected file retention period, whether to strip EXIF tags, and more).
 * ShareX support with config file builder in the homepage.
-* Token-based authentication on all APIs, allowing you to easily integrate it with anything.
+* Token-based authentication on all APIs, allowing you to easily integrate the service with anything.
 * ... and more!
 
 ## Differences with Upstream/Chibisafe
