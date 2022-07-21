@@ -12,7 +12,6 @@ process.on('unhandledRejection', error => {
 // Libraries
 const helmet = require('helmet')
 const HyperExpress = require('hyper-express')
-const LiveDirectory = require('live-directory')
 const NodeClam = require('clamscan')
 const { accessSync, constants } = require('fs')
 
