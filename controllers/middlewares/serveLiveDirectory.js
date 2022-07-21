@@ -1,5 +1,5 @@
 const LiveDirectory = require('live-directory')
-const serveUtils = require('../utils/serveUtils')
+const serveUtils = require('./../utils/serveUtils')
 
 class ServeLiveDirectory {
   instance
