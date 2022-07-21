@@ -23,7 +23,7 @@ routes.get('/a/:identifier', async (req, res) => {
     return errors.handleNotFound(req, res)
   }
 
-  const nojs = req.query.nojs !== undefined
+  const nojs = req.query_parameters.nojs !== undefined
 
   let cacheid
   if (process.env.NODE_ENV !== 'development') {

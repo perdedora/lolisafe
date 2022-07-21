@@ -511,7 +511,7 @@ self.getUpstreamCompat = async (req, res) => {
 }
 
 self.generateZip = async (req, res) => {
-  const versionString = parseInt(req.query.v)
+  const versionString = parseInt(req.query_parameters.v)
 
   const identifier = req.path_parameters.identifier
   if (identifier === undefined) {

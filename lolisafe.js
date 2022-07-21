@@ -180,7 +180,7 @@ if (config.cacheControl) {
 
   // Consider album ZIPs static as well, since they use version in their query string
   safe.use('/api/album/zip', (req, res, next) => {
-    const versionString = parseInt(req.query.v)
+    const versionString = parseInt(req.query_parameters.v)
     if (versionString > 0) {
       res.header('Cache-Control', cacheControls.static)
     } else {
