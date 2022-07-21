@@ -22,8 +22,10 @@ class RateLimiter {
     this.rateLimiterMemory = new RateLimiterMemory(options)
   }
 
-  async #middleware (req, res) {
-    if (res.locals.rateLimit) return
+  #middleware (req, res, next) {
+    if (res.locals.rateLimit) {
+      return next()
+    }
 
     // If unset, assume points pool is shared to all visitors of each route
     const key = this.#requestKey ? req[this.#requestKey] : req.path
@@ -31,21 +33,22 @@ class RateLimiter {
     if (this.#whitelistedKeys.has(key)) {
       // Set the Response local variable for earlier bypass in any subsequent RateLimit middlewares
       res.locals.rateLimit = 'BYPASS'
-      return
+      return next()
     }
 
     // Always consume only 1 point
-    await this.rateLimiterMemory.consume(key, 1)
+    this.rateLimiterMemory.consume(key, 1)
       .then(result => {
         res.locals.rateLimit = result
         res.header('Retry-After', String(result.msBeforeNext / 1000))
         res.header('X-RateLimit-Limit', String(this.rateLimiterMemory._points))
         res.header('X-RateLimit-Remaining', String(result.remainingPoints))
         res.header('X-RateLimit-Reset', String(new Date(Date.now() + result.msBeforeNext)))
+        return next()
       })
       .catch(reject => {
         // Re-throw with ClientError
-        throw new ClientError('Rate limit reached, please try again in a while.', { statusCode: 429 })
+        return next(new ClientError('Rate limit reached, please try again in a while.', { statusCode: 429 }))
       })
   }
 
