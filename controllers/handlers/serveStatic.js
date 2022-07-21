@@ -10,8 +10,6 @@ const utils = require('./../utilsController')
 const serveUtils = require('./../utils/serveUtils')
 const logger = require('./../../logger')
 
-// NOTE: This middleware must be set last if on a root path that is also used by other routes
-
 class ServeStatic {
   directory
   contentDispositionStore
@@ -22,8 +20,6 @@ class ServeStatic {
   #options
 
   constructor (directory, options = {}) {
-    logger.debug(`new ServeStatic(): ${directory}`)
-
     if (!directory || typeof directory !== 'string') {
       throw new TypeError('Root directory must be set')
     }
@@ -140,7 +136,7 @@ class ServeStatic {
    * MIT Licensed
    */
 
-  async #middleware (req, res) {
+  async #handler (req, res) {
     if (this.#options.ignorePatterns && this.#options.ignorePatterns.some(pattern => req.path.startsWith(pattern))) {
       return errors.handleNotFound(req, res)
     }
@@ -279,8 +275,8 @@ class ServeStatic {
     return res.stream(readStream)
   }
 
-  get middleware () {
-    return this.#middleware.bind(this)
+  get handler () {
+    return this.#handler.bind(this)
   }
 }
 

@@ -43,12 +43,14 @@ const paths = require('./controllers/pathsController')
 paths.initSync()
 const utils = require('./controllers/utilsController')
 
-// Custom middlewares
+// Middlewares
 const ExpressCompat = require('./controllers/middlewares/expressCompat')
 const NunjucksRenderer = require('./controllers/middlewares/nunjucksRenderer')
 const RateLimiter = require('./controllers/middlewares/rateLimiter')
 const ServeLiveDirectory = require('./controllers/middlewares/serveLiveDirectory')
-const ServeStatic = require('./controllers/middlewares/serveStatic')
+
+// Handlers
+const ServeStatic = require('./controllers/handlers/serveStatic')
 
 // Routes
 const album = require('./routes/album')
@@ -273,8 +275,8 @@ safe.use('/api', api)
         overrideContentTypes: config.overrideContentTypes,
         setContentDisposition: config.setContentDisposition
       })
-      safe.get('/*', serveStaticInstance.middleware)
-      safe.head('/*', serveStaticInstance.middleware)
+      safe.get('/*', serveStaticInstance.handler)
+      safe.head('/*', serveStaticInstance.handler)
       utils.contentDispositionStore = serveStaticInstance.contentDispositionStore
     }
 
