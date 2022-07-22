@@ -31,7 +31,7 @@ const self = {
 const saltRounds = 10
 
 self.verify = async (req, res) => {
-  await utils.assertRequestType(req, 'json')
+  utils.assertRequestType(req, 'json')
 
   // Parse POST body
   req.body = await req.json()
@@ -65,7 +65,7 @@ self.verify = async (req, res) => {
 }
 
 self.register = async (req, res) => {
-  await utils.assertRequestType(req, 'json')
+  utils.assertRequestType(req, 'json')
 
   // Parse POST body
   req.body = await req.json()
@@ -117,7 +117,7 @@ self.register = async (req, res) => {
 }
 
 self.changePassword = async (req, res) => {
-  await utils.assertRequestType(req, 'json')
+  utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
 
   // Parse POST body
@@ -150,7 +150,7 @@ self.assertPermission = (user, target) => {
 }
 
 self.createUser = async (req, res) => {
-  await utils.assertRequestType(req, 'json')
+  utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
 
   // Parse POST body
@@ -216,7 +216,7 @@ self.createUser = async (req, res) => {
 }
 
 self.editUser = async (req, res) => {
-  await utils.assertRequestType(req, 'json')
+  utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
 
   // Parse POST body, if required
@@ -273,7 +273,7 @@ self.editUser = async (req, res) => {
 }
 
 self.disableUser = async (req, res) => {
-  await utils.assertRequestType(req, 'json')
+  utils.assertRequestType(req, 'json')
 
   // Parse POST body and re-map for .editUser()
   req.body = await req.json()
@@ -288,7 +288,7 @@ self.disableUser = async (req, res) => {
 }
 
 self.deleteUser = async (req, res) => {
-  await utils.assertRequestType(req, 'json')
+  utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
 
   // Parse POST body
