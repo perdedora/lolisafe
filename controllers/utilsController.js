@@ -373,6 +373,12 @@ self.stripIndents = string => {
   return result
 }
 
+self.assertRequestType = (req, type) => {
+  if (!req.is(type)) {
+    throw new ClientError(`Request type must be ${type.toUpperCase()}.`)
+  }
+}
+
 self.assertUser = async (token, fields) => {
   const _fields = ['id', 'username', 'enabled', 'timestamp', 'permission', 'registration']
   if (typeof fields === 'string') fields = [fields]

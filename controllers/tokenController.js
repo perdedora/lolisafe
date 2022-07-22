@@ -34,6 +34,8 @@ self.generateUniqueToken = async () => {
 }
 
 self.verify = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
+
   // Parse POST body
   req.body = await req.json()
 

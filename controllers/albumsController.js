@@ -189,6 +189,7 @@ self.list = async (req, res) => {
 }
 
 self.create = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
 
   // Parse POST body
@@ -233,16 +234,20 @@ self.create = async (req, res) => {
 }
 
 self.delete = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
+
   // Parse POST body and re-map for .disable()
   req.body = await req.json()
     .then(obj => {
       obj.del = true
       return obj
     })
+
   return self.disable(req, res)
 }
 
 self.disable = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
   const ismoderator = perms.is(user, 'moderator')
 
@@ -316,6 +321,7 @@ self.disable = async (req, res) => {
 }
 
 self.edit = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
   const ismoderator = perms.is(user, 'moderator')
 
@@ -418,6 +424,8 @@ self.edit = async (req, res) => {
 }
 
 self.rename = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
+
   // Parse POST body and re-map for .edit()
   req.body = await req.json()
     .then(obj => {
@@ -426,6 +434,7 @@ self.rename = async (req, res) => {
         name: obj.name
       }
     })
+
   return self.edit(req, res)
 }
 
@@ -627,6 +636,7 @@ self.generateZip = async (req, res) => {
 }
 
 self.addFiles = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
 
   // Parse POST body

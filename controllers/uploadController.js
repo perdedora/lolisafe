@@ -626,6 +626,8 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
 /** Chunk uploads */
 
 self.finishChunks = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
+
   if (!chunkedUploads) {
     throw new ClientError('Chunked upload is disabled.', { statusCode: 403 })
   }
@@ -1048,6 +1050,8 @@ self.sendUploadResponse = async (req, res, user, result) => {
 /** Delete uploads */
 
 self.delete = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
+
   // Parse POST body and re-map for .bulkDelete()
   // Original API used by lolisafe v3's frontend
   // Meanwhile this fork's frontend uses .bulkDelete() straight away
@@ -1059,10 +1063,12 @@ self.delete = async (req, res) => {
         values: isNaN(id) ? undefined : [id]
       }
     })
+
   return self.bulkDelete(req, res)
 }
 
 self.bulkDelete = async (req, res) => {
+  await utils.assertRequestType(req, 'json')
   const user = await utils.authorize(req)
 
   // Parse POST body, if required
