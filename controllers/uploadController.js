@@ -197,6 +197,14 @@ self.parseStripTags = stripTags => {
 /** File uploads */
 
 self.upload = async (req, res) => {
+  // Assert Request type
+  // Multipart for regular uploads, JSON for URL uploads
+  const isMultipart = req.is('multipart')
+  const isJson = req.is('json')
+  if (!isMultipart && !isJson) {
+    throw new ClientError('Request type must be MULTIPART or JSON.')
+  }
+
   let user
   if (config.private === true) {
     user = await utils.authorize(req)
@@ -215,12 +223,19 @@ self.upload = async (req, res) => {
 
   const age = self.assertRetentionPeriod(user, req.headers.age)
 
-  // Init empty Request.body
-  req.body = {}
+  if (isMultipart) {
+    return self.actuallyUpload(req, res, user, { albumid, age })
+  } else {
+    // Parse POST body
+    req.body = await req.json()
+    return self.actuallyUploadUrls(req, res, user, { albumid, age })
+  }
+}
 
-  // Initially try to parse as multipart
-  // TODO: Check Request's Content-Type instead of always trying to parse as multipart
-  let hasMultipartField = false
+self.actuallyUpload = async (req, res, user, data = {}) => {
+  // Init empty Request.body and Request.files
+  req.body = {}
+  req.files = []
 
   const unlinkFiles = async files => {
     return Promise.all(files.map(async file => {
@@ -244,8 +259,6 @@ self.upload = async (req, res) => {
       files: maxFilesPerUpload
     }
   }, async field => {
-    hasMultipartField = true
-
     // Keep non-files fields in Request.body
     // Since fields get processed in sequence depending on the order at which they were defined,
     // chunked uploads data must be set before the files[] field which contain the actual file
@@ -262,15 +275,10 @@ self.upload = async (req, res) => {
 
     // Process files immediately and push into Request.files array
     if (field.file) {
-      // Init Request.files array if not previously set
-      if (req.files === undefined) {
-        req.files = []
-      }
-
       // Push immediately as we will only be adding props into the file object down the line
       const file = {
-        albumid,
-        age,
+        albumid: data.albumid,
+        age: data.age,
         mimetype: field.mime_type,
         isChunk: req.body.uuid !== undefined &&
           req.body.chunkindex !== undefined
@@ -416,25 +424,16 @@ self.upload = async (req, res) => {
     }
   })
 
-  if (hasMultipartField) {
-    if (!Array.isArray(req.files) || !req.files.length) {
-      throw new ClientError('No files.')
-    } else if (req.files.some(file => file.error)) {
-      // Unlink temp files (do not wait)
-      unlinkFiles(req.files)
-      // If req.multipart() did not error out, but some file object did,
-      // then Request connection was likely dropped
-      return
-    }
-    return self.actuallyUpload(req, res, user)
-  } else {
-    // Parse POST body
-    req.body = await req.json()
-    return self.actuallyUploadUrls(req, res, user, { albumid, age })
+  if (!req.files.length) {
+    throw new ClientError('No files.')
+  } else if (req.files.some(file => file.error)) {
+    // Unlink temp files (do not wait)
+    unlinkFiles(req.files)
+    // If req.multipart() did not error out, but some file field did,
+    // then Request connection was likely dropped
+    return
   }
-}
 
-self.actuallyUpload = async (req, res, user, data = {}) => {
   // If chunked uploads is enabled and the uploaded file is a chunk, then just say that it was a success
   const uuid = req.body.uuid
   if (chunkedUploads && chunksData[uuid] !== undefined) {
