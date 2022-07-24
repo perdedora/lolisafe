@@ -199,10 +199,10 @@ self.parseStripTags = stripTags => {
 self.upload = async (req, res) => {
   // Assert Request type
   // Multipart for regular uploads, JSON for URL uploads
-  const isMultipart = req.is('multipart')
-  const isJson = req.is('json')
+  const isMultipart = req.is('multipart/form-data')
+  const isJson = req.is('application/json')
   if (!isMultipart && !isJson) {
-    throw new ClientError('Request type must be MULTIPART or JSON.')
+    throw new ClientError('Request Content-Type must be either multipart/form-data or application/json.')
   }
 
   let user
