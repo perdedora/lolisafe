@@ -375,7 +375,7 @@ self.stripIndents = string => {
 
 self.assertRequestType = (req, type) => {
   if (!req.is(type)) {
-    throw new ClientError(`Request type must be ${type.toUpperCase()}.`)
+    throw new ClientError(`Request Content-Type must be ${type}.`)
   }
 }
 
