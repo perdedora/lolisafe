@@ -43,13 +43,13 @@ paths.initSync()
 const utils = require('./controllers/utilsController')
 
 // Middlewares
-const ExpressCompat = require('./controllers/middlewares/expressCompat')
-const NunjucksRenderer = require('./controllers/middlewares/nunjucksRenderer')
-const RateLimiter = require('./controllers/middlewares/rateLimiter')
-const ServeLiveDirectory = require('./controllers/middlewares/serveLiveDirectory')
+const ExpressCompat = require('./controllers/middlewares/ExpressCompat')
+const NunjucksRenderer = require('./controllers/middlewares/NunjucksRenderer')
+const RateLimiter = require('./controllers/middlewares/RateLimiter')
+const ServeLiveDirectory = require('./controllers/middlewares/ServeLiveDirectory')
 
 // Handlers
-const ServeStatic = require('./controllers/handlers/serveStatic')
+const ServeStatic = require('./controllers/handlers/ServeStatic')
 
 // Routes
 const album = require('./routes/album')
