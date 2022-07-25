@@ -46,6 +46,11 @@ const extensionsFilter = Array.isArray(config.extensionsFilter) &&
 const urlExtensionsFilter = Array.isArray(config.uploads.urlExtensionsFilter) &&
   config.uploads.urlExtensionsFilter.length
 
+// Only disable hashing if explicitly disabled in config file
+const enableHashing = config.uploads.hash === undefined
+  ? true
+  : Boolean(config.uploads.hash)
+
 /** Chunks helper class & function **/
 
 class ChunksData {
@@ -93,7 +98,7 @@ const initChunks = async uuid => {
 
     // Init write & hasher streams
     chunksData[uuid].writeStream = fs.createWriteStream(chunksData[uuid].path, { flags: 'a' })
-    chunksData[uuid].hashStream = blake3.createHash()
+    chunksData[uuid].hashStream = enableHashing && blake3.createHash()
   } else if (chunksData[uuid].processing) {
     // Wait for the first spawned init tasks
     throw new ClientError('Previous chunk upload is still being processed. Parallel chunked uploads is not supported.')
@@ -332,9 +337,7 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
         // Helper function to remove event listeners from multiple emitters
         const _unlisten = (emitters = [], event, listener) => {
           for (const emitter of emitters) {
-            if (emitter !== undefined) {
-              emitter.off(event, listener)
-            }
+            if (emitter) emitter.off(event, listener)
           }
         }
 
@@ -381,7 +384,7 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
           hashStream = file.chunksData.hashStream
         } else {
           writeStream = fs.createWriteStream(file.path)
-          hashStream = blake3.createHash()
+          hashStream = enableHashing && blake3.createHash()
 
           if (utils.scan.passthrough &&
             !self.scanHelpers.assertUserBypass(req._user, file.filename) &&
@@ -392,11 +395,11 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
 
         // Re-init stream errors listeners for this Request
         writeStream.once('error', _reject)
-        hashStream.once('error', _reject)
         readStream.once('error', _reject)
 
         // Pass data into hashStream if required
         if (hashStream) {
+          hashStream.once('error', _reject)
           readStream.on('data', data => {
             // .dispose() will destroy this internal component,
             // so use it as an indicator of whether the hashStream has been .dispose()'d
@@ -417,7 +420,9 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
           // both writeStream and scanStream finish
           writeStream.once('finish', () => _resolve({
             size: writeStream.bytesWritten,
-            hash: hashStream.hash.hash ? hashStream.digest('hex') : null
+            hash: hashStream && hashStream.hash.hash
+              ? hashStream.digest('hex')
+              : null
           }, scanStream ? 1 : 2))
 
           if (scanStream) {
@@ -582,21 +587,25 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
     let hashStream
     return Promise.resolve().then(async () => {
       writeStream = fs.createWriteStream(file.path)
-      hashStream = blake3.createHash()
+      hashStream = enableHashing && blake3.createHash()
 
       // Limit max response body size with maximum allowed size
       const fetchFile = await fetch(url, { method: 'GET', size: urlMaxSizeBytes })
         .then(res => new Promise((resolve, reject) => {
-          if (res.status === 200) {
-            writeStream.on('error', reject)
-            res.body.on('error', reject)
-            res.body.on('data', d => hashStream.update(d))
-
-            res.body.pipe(writeStream)
-            writeStream.on('finish', () => resolve(res))
-          } else {
-            resolve(res)
+          if (res.status !== 200) {
+            return resolve(res)
           }
+
+          writeStream.once('error', reject)
+          res.body.once('error', reject)
+
+          if (hashStream) {
+            hashStream.once('error', reject)
+            res.body.on('data', d => hashStream.update(d))
+          }
+
+          res.body.pipe(writeStream)
+          writeStream.once('finish', () => resolve(res))
         }))
 
       if (fetchFile.status !== 200) {
@@ -610,17 +619,17 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
       const contentType = fetchFile.headers.get('content-type')
       file.mimetype = contentType ? contentType.split(';')[0] : 'application/octet-stream'
       file.size = writeStream.bytesWritten
-      file.hash = hashStream.digest('hex')
+      file.hash = hashStream
+        ? hashStream.digest('hex')
+        : null
     }).catch(err => {
       // Dispose of unfinished write & hasher streams
       if (writeStream && !writeStream.destroyed) {
         writeStream.destroy()
       }
-      try {
-        if (hashStream) {
-          hashStream.dispose()
-        }
-      } catch (_) {}
+      if (hashStream && hashStream.hash.hash) {
+        hashStream.dispose()
+      }
 
       // Re-throw errors
       throw err
@@ -710,7 +719,9 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
     // Conclude write and hasher streams
     chunksData[file.uuid].writeStream.end()
     const bytesWritten = chunksData[file.uuid].writeStream.bytesWritten
-    const hash = chunksData[file.uuid].hashStream.digest('hex')
+    const hash = chunksData[file.uuid].hashStream
+      ? chunksData[file.uuid].hashStream.digest('hex')
+      : null
 
     if (chunksData[file.uuid].chunks < 2 || chunksData[file.uuid].chunks > maxChunksCount) {
       throw new ClientError('Invalid chunks count.')
@@ -792,11 +803,9 @@ self.cleanUpChunks = async uuid => {
   if (chunksData[uuid].writeStream && !chunksData[uuid].writeStream.destroyed) {
     chunksData[uuid].writeStream.destroy()
   }
-  try {
-    if (chunksData[uuid].hashStream) {
-      chunksData[uuid].hashStream.dispose()
-    }
-  } catch (_) {}
+  if (chunksData[uuid].hashStream && chunksData[uuid].hashStream.hash.hash) {
+    chunksData[uuid].hashStream.dispose()
+  }
 
   // Remove tmp file
   await paths.unlink(path.join(chunksData[uuid].root, chunksData[uuid].filename))
@@ -952,36 +961,38 @@ self.storeFilesToDb = async (req, res, user, filesData) => {
   const albumids = []
 
   await Promise.all(filesData.map(async file => {
-    // Check if the file exists by checking its hash and size
-    const dbFile = await utils.db.table('files')
-      .where(function () {
-        if (user === undefined) {
-          this.whereNull('userid')
-        } else {
-          this.where('userid', user.id)
+    if (enableHashing) {
+      // Check if the file exists by checking its hash and size
+      const dbFile = await utils.db.table('files')
+        .where(function () {
+          if (user === undefined) {
+            this.whereNull('userid')
+          } else {
+            this.where('userid', user.id)
+          }
+        })
+        .where({
+          hash: file.hash,
+          size: String(file.size)
+        })
+        // Select expirydate to display expiration date of existing files as well
+        .select('name', 'expirydate')
+        .first()
+
+      if (dbFile) {
+        // Continue even when encountering errors
+        await utils.unlinkFile(file.filename).catch(logger.error)
+        logger.debug(`Unlinked ${file.filename} since a duplicate named ${dbFile.name} exists`)
+
+        // If on /nojs route, append original name reported by client,
+        // instead of the actual original name from database
+        if (req.path === '/nojs') {
+          dbFile.original = file.originalname
         }
-      })
-      .where({
-        hash: file.hash,
-        size: String(file.size)
-      })
-      // Select expirydate to display expiration date of existing files as well
-      .select('name', 'expirydate')
-      .first()
 
-    if (dbFile) {
-      // Continue even when encountering errors
-      await utils.unlinkFile(file.filename).catch(logger.error)
-      logger.debug(`Unlinked ${file.filename} since a duplicate named ${dbFile.name} exists`)
-
-      // If on /nojs route, append original name reported by client,
-      // instead of the actual original name from database
-      if (req.path === '/nojs') {
-        dbFile.original = file.originalname
+        exists.push(dbFile)
+        return
       }
-
-      exists.push(dbFile)
-      return
     }
 
     const timestamp = Math.floor(Date.now() / 1000)

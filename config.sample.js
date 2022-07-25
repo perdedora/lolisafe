@@ -468,6 +468,13 @@ module.exports = {
     temporaryUploadsInterval: 1 * 60000, // 1 minute
 
     /*
+      Hash files on upload.
+      If enabled, the service will also attempt to detect duplicates by searching for uploads
+      with the exact same hash and size in the database.
+    */
+    hash: true,
+
+    /*
       Scan uploads for threats with ClamAV.
 
       groupBypass: Name of the lowest ranked group whose files will not be scanned.
