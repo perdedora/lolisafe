@@ -58,8 +58,6 @@ const file = require('./routes/file')
 const nojs = require('./routes/nojs')
 const player = require('./routes/player')
 
-const isDevMode = process.env.NODE_ENV === 'development'
-
 // Express-compat
 const expressCompatInstance = new ExpressCompat()
 safe.use(expressCompatInstance.middleware)
@@ -122,7 +120,7 @@ if (config.accessControlAllowOrigin) {
 
 // NunjucksRenderer middleware
 const nunjucksRendererInstance = new NunjucksRenderer('views', {
-  watch: isDevMode
+  watch: utils.devmode
 })
 safe.use(nunjucksRendererInstance.middleware)
 
@@ -258,7 +256,7 @@ safe.use('/api', api)
           // These rendered pages are persistently cached during production
           return res.render(page, {
             config, utils, versions: utils.versionStrings
-          }, !isDevMode)
+          }, !utils.devmode)
         }
       }
       return next()
@@ -351,10 +349,10 @@ safe.use('/api', api)
 
         temporaryUploadsInProgress = true
         try {
-          const result = await utils.bulkDeleteExpired(false, isDevMode)
+          const result = await utils.bulkDeleteExpired(false, utils.devmode)
 
           if (result.expired.length || result.failed.length) {
-            if (isDevMode) {
+            if (utils.devmode) {
               let logMessage = `Expired uploads (${result.expired.length}): ${result.expired.map(_file => _file.name).join(', ')}`
               if (result.failed.length) {
                 logMessage += `\nErrored (${result.failed.length}): ${result.failed.map(_file => _file.name).join(', ')}`
@@ -381,7 +379,7 @@ safe.use('/api', api)
     }
 
     // NODE_ENV=development yarn start
-    if (isDevMode) {
+    if (utils.devmode) {
       const { inspect } = require('util')
       // Add readline interface to allow evaluating arbitrary JavaScript from console
       require('readline').createInterface({

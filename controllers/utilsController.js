@@ -16,6 +16,7 @@ const config = require('./../config')
 const logger = require('./../logger')
 
 const self = {
+  devmode: process.env.NODE_ENV === 'development',
   db: knex(config.database),
   conf: {
     // Allow some config options to be overriden via env vars
