@@ -10,20 +10,20 @@
 
 * Powered by [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js/) & [HyperExpress](https://github.com/kartikk221/hyper-express) for a much more performant web server, due to being a Node.js binding of [uWebSockets](https://github.com/uNetworking/uWebSockets) written in C & C++.
 * Powered by [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) for performant SQLite3 database (using [Knex.js](https://knexjs.org/) for abstraction, thus support for other database engines *may* also come in the future).
-* Faster file hashing for duplicates detection by using [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) hash function, powered by [blake3](https://github.com/connor4312/blake3) Node.js library.
+* Faster file hashing for duplicates detection by using [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) hash function.
 * ClamAV virus scanning support for Linux/OS X servers ([read more](#clamav-support)).
 * Front-end pages templating with [Nunjucks](https://mozilla.github.io/nunjucks/).
 * A more integrated Cloudflare support (automatically purge files remote cache upon deletion, and more).
 * Chunked uploads to support 100MB+ files when hosted behind Cloudflare, or any other proxies with file upload size limits.
 * Upload remote URLs (have the service download those remote files for you).
-* Performant rate limits powered by [rate-limiter-flexible](https://github.com/animir/node-rate-limiter-flexible).
+* Performant & configurable rate limits powered by [rate-limiter-flexible](https://github.com/animir/node-rate-limiter-flexible).
 * Albums with shareable pretty public pages.
 * User dashboard to manage own uploads and albums.
 * Admin dashboard to manage all uploads, albums, and users.
 * Robust files search/filters and sorting in the dashboard.
 * Usergroups-based permissions.
 * Configurable file retention periods per-usergroups.
-* Strip images EXIF tags if required (can be set to be toggleable by users, and with experimental support for stripping videos tags as well).
+* Strip images EXIF tags if required (can be forced or toggleable by users, and with experimental support for stripping videos tags as well).
 * Various options configurable via header tags upon file uploads (selected file retention period, whether to strip EXIF tags, and more).
 * ShareX support with config file builder in the homepage.
 * Token-based authentication on all APIs, allowing you to easily integrate the service with anything.
