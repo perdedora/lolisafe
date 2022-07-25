@@ -637,9 +637,11 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
   })).catch(async error => {
     // Unlink temp files (do not wait)
     if (filesData.length) {
-      Promise.all(filesData.map(async file =>
-        utils.unlinkFile(file.filename).catch(logger.error)
-      ))
+      Promise.all(filesData.map(async file => {
+        if (file.filename) {
+          utils.unlinkFile(file.filename).catch(logger.error)
+        }
+      }))
     }
 
     // Re-throw suppressed errors as ClientError, otherwise as-is
