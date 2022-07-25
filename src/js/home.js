@@ -383,7 +383,9 @@ page.prepareDropzone = () => {
     headers: { token: page.token },
     chunking: Boolean(page.chunkSize),
     chunkSize: page.chunkSize * 1e6, // this option expects Bytes
-    parallelChunkUploads: false, // for now, enabling this breaks descriptive upload progress
+    // Lolisafe cannot handle parallel chunked uploads
+    // due to technical reasons involving how we optimize I/O performance
+    parallelChunkUploads: false,
     timeout: 0,
 
     init () {
@@ -553,12 +555,13 @@ page.prepareDropzone = () => {
       file.previewElement.querySelector('.descriptive-progress').innerHTML =
         `Rebuilding ${file.upload.totalChunkCount} chunks\u2026`
 
-      return axios.post('api/upload/finishchunks', {
+      axios.post('api/upload/finishchunks', {
         // This API supports an array of multiple files
         files: [{
           uuid: file.upload.uuid,
           original: file.name,
           type: file.type,
+          size: file.size,
           albumid: page.album,
           filelength: page.fileLength,
           age: page.uploadAge
@@ -584,7 +587,7 @@ page.prepareDropzone = () => {
           page.updateTemplate(file, response.data.files[0])
         }
 
-        return done()
+        done()
       })
     }
   })
