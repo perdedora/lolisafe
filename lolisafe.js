@@ -10,16 +10,16 @@ process.on('unhandledRejection', error => {
 })
 
 // Libraries
+const fs = require('fs')
 const helmet = require('helmet')
 const HyperExpress = require('hyper-express')
 const NodeClam = require('clamscan')
-const { accessSync, constants } = require('fs')
 
 // Check required config files
 const configFiles = ['config.js', 'views/_globals.njk']
 for (const _file of configFiles) {
   try {
-    accessSync(_file, constants.R_OK)
+    fs.accessSync(_file, fs.constants.R_OK)
   } catch (error) {
     logger.error(`Config file '${_file}' cannot be found or read.`)
     logger.error('Please copy the provided sample file and modify it according to your needs.')
