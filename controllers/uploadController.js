@@ -440,13 +440,14 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
         }
       })
 
-      if (config.filterEmptyFile && file.size === 0) {
+      // file.size is not populated if a chunk upload, so ignore
+      if (config.filterEmptyFile && !file.isChunk && file.size === 0) {
         throw new ClientError('Empty files are not allowed.')
       }
     }
   }).catch(error => {
     // Unlink temp files (do not wait)
-    if (Array.isArray(req.files) && req.files.length) {
+    if (req.files.length) {
       unlinkFiles(req.files)
     }
 
@@ -637,9 +638,8 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
     // Unlink temp files (do not wait)
     if (filesData.length) {
       Promise.all(filesData.map(async file => {
-        if (file.filename) {
-          utils.unlinkFile(file.filename).catch(logger.error)
-        }
+        if (!file.filename) return
+        return utils.unlinkFile(file.filename).catch(logger.error)
       }))
     }
 
