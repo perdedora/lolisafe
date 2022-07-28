@@ -265,6 +265,8 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
 
   await req.multipart({
     // https://github.com/mscdex/busboy/tree/v1.6.0#exports
+    // This would otherwise defaults to latin1
+    defParamCharset: 'utf8',
     limits: {
       fileSize: maxSizeBytes,
       // Maximum number of non-file fields.
@@ -298,7 +300,8 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
       const file = {
         albumid: data.albumid,
         age: data.age,
-        mimetype: field.mime_type,
+        originalname: field.file.name || '',
+        mimetype: field.mime_type || '',
         isChunk: req.body.uuid !== undefined &&
           req.body.chunkindex !== undefined
       }
@@ -311,10 +314,6 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
           throw new ClientError('Chunked uploads may only be uploaded 1 chunk at a time.')
         }
       }
-
-      // NOTE: Since busboy@1, filenames no longer get automatically parsed as UTF-8, so we force it here
-      file.originalname = field.file.name &&
-        Buffer.from(field.file.name, 'latin1').toString('utf8')
 
       file.extname = utils.extname(file.originalname)
       if (self.isExtensionFiltered(file.extname)) {
