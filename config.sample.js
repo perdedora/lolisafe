@@ -567,42 +567,21 @@ module.exports = {
     },
 
     /*
-      Cache file identifiers.
+      The service will query database on every new uploads,
+      to make sure newly generated random identifier will not match any existing uploads.
 
-      They will be used for stricter collision checks, such that a single identifier
-      may not be used by more than a single file (e.g. if "abcd.jpg" already exists, a new PNG
-      file may not be named as "abcd.png").
+      Otherwise, the same identifier may be used by multiple different extensions
+      (e.g. if "abcd.jpg" already exists, new files can be named as "abcd.png", "abcd.mp4", etc).
 
-      If this is enabled, the safe will query files from the database during first launch,
-      parse their names, then cache the identifiers into memory.
-      Its downside is that it will use a bit more memory.
-
-      If this is disabled, collision check will become less strict.
-      As in, the same identifier may be used by multiple different extensions (e.g. if "abcd.jpg"
-      already exists, new files can be possibly be named as "abcd.png", "abcd.mp4", etc).
-      Its downside will be, in the rare chance that multiple image/video files are sharing the same
-      identifier, they will end up with the same thumbnail in dashboard, since thumbnails will
+      In the rare chance that multiple image/video files are sharing the same identifier,
+      they will end up with the same thumbnail in dashboard, since thumbnails will
       only be saved as PNG in storage (e.g. "abcd.jpg" and "abcd.png" will share a single thumbnail
       named "abcd.png" in thumbs directory, in which case, the file that's uploaded the earliest will
       be the source for the thumbnail).
 
       Unless you do not use thumbnails, it is highly recommended to enable this feature.
     */
-    cacheFileIdentifiers: false,
-
-    /*
-      An alternative to caching file identifiers.
-
-      Basically the service will instead query the database for stricter collision checks.
-      Right off the bat this has the disadvantage of adding one or more SQL queries on every
-      new uploads, but it has the advantage of not having to pre-cache anything.
-      Essentially this reduces the service's startup time and memory usage, but slows down new uploads.
-
-      As this is an alternative, you need to disable cacheFileIdentifiers to use this.
-
-      You'll have to figure out which method suits your use case best.
-    */
-    queryDbForFileCollisions: true,
+    queryDatabaseForIdentifierMatch: true,
 
     /*
       The length of the randomly generated identifier for albums.

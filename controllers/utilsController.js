@@ -45,7 +45,6 @@ const self = {
     defaultRenderers: {}
   },
   gitHash: null,
-  idSet: null,
 
   idMaxTries: config.uploads.maxTries || 1,
 
@@ -592,14 +591,8 @@ self.unlinkFile = async (filename, predb) => {
   }
 
   const identifier = filename.split('.')[0]
-
-  // Do not remove from identifiers cache on pre-db-deletion
-  if (!predb && self.idSet) {
-    self.idSet.delete(identifier)
-    logger.debug(`Removed ${identifier} from identifiers cache (deleteFile)`)
-  }
-
   const extname = self.extname(filename, true)
+
   if (self.imageExts.includes(extname) || self.videoExts.includes(extname)) {
     try {
       await paths.unlink(path.join(paths.thumbs, `${identifier}.png`))
@@ -661,14 +654,6 @@ self.bulkDeleteFromDb = async (field, values, user) => {
         .whereIn('id', unlinked.map(file => file.id))
         .del()
       self.invalidateStatsCache('uploads')
-
-      if (self.idSet) {
-        unlinked.forEach(file => {
-          const identifier = file.name.split('.')[0]
-          self.idSet.delete(identifier)
-          logger.debug(`Removed ${identifier} from identifiers cache (bulkDeleteFromDb)`)
-        })
-      }
 
       unlinked.forEach(file => {
         // Push album ids

@@ -12,8 +12,15 @@ const ServerError = require('./utils/ServerError')
 const config = require('./../config')
 const logger = require('./../logger')
 
+/** Deprecated config options */
+
+if (config.uploads.cacheFileIdentifiers) {
+  logger.error('Config option "uploads.cacheFileIdentifiers" is DEPRECATED.')
+  logger.error('There is now only "uploads.queryDatabaseForIdentifierMatch" for a similar behavior.')
+}
+
 const self = {
-  onHold: new Set(),
+  onHold: new Set(), // temporarily held random upload identifiers
   scanHelpers: {}
 }
 
@@ -50,6 +57,9 @@ const urlExtensionsFilter = Array.isArray(config.uploads.urlExtensionsFilter) &&
 const enableHashing = config.uploads.hash === undefined
   ? true
   : Boolean(config.uploads.hash)
+
+const queryDatabaseForIdentifierMatch = config.uploads.queryDatabaseForIdentifierMatch ||
+  config.uploads.queryDbForFileCollisions // old config name for identical behavior
 
 /** Chunks helper class & function **/
 
@@ -139,19 +149,16 @@ self.parseFileIdentifierLength = fileLength => {
   }
 }
 
-self.getUniqueRandomName = async (length, extension) => {
+self.getUniqueUploadIdentifier = async (length, extension = '', res) => {
   for (let i = 0; i < utils.idMaxTries; i++) {
     const identifier = randomstring.generate(length)
-    const name = identifier + extension
-    if (config.uploads.cacheFileIdentifiers) {
-      if (utils.idSet.has(identifier)) {
-        logger.log(`Identifier ${identifier} is already in use (${i + 1}/${utils.idMaxTries}).`)
+
+    if (queryDatabaseForIdentifierMatch) {
+      // If must query database for identifiers matches
+      if (self.onHold.has(identifier)) {
+        logger.log(`Identifier ${identifier} is currently held by another upload (${i + 1}/${utils.idMaxTries}).`)
         continue
       }
-      utils.idSet.add(identifier)
-      logger.debug(`Added ${identifier} to identifiers cache`)
-    } else if (config.uploads.queryDbForFileCollisions) {
-      if (self.onHold.has(identifier)) continue
 
       // Put token on-hold (wait for it to be inserted to DB)
       self.onHold.add(identifier)
@@ -165,8 +172,19 @@ self.getUniqueRandomName = async (length, extension) => {
         logger.log(`Identifier ${identifier} is already in use (${i + 1}/${utils.idMaxTries}).`)
         continue
       }
+
+      // Unhold identifier once the Response has been sent
+      if (res) {
+        if (!res.locals.identifiers) {
+          res.locals.identifiers = []
+          res.once('finish', () => { self.unholdUploadIdentifiers(res) })
+        }
+        res.locals.identifiers.push(identifier)
+      }
     } else {
+      // Otherwise, check for physical files' full name matches
       try {
+        const name = identifier + extension
         await paths.access(path.join(paths.uploads, name))
         logger.log(`${name} is already in use (${i + 1}/${utils.idMaxTries}).`)
         continue
@@ -175,10 +193,23 @@ self.getUniqueRandomName = async (length, extension) => {
         if (error & error.code !== 'ENOENT') throw error
       }
     }
-    return name
+
+    // Return the random identifier only
+    return identifier
   }
 
   throw new ServerError('Failed to allocate a unique name for the upload. Try again?')
+}
+
+self.unholdUploadIdentifiers = res => {
+  if (!res.locals.identifiers) return
+
+  for (const identifier of res.locals.identifiers) {
+    self.onHold.delete(identifier)
+    logger.debug(`Unhold identifier ${identifier}.`)
+  }
+
+  delete res.locals.identifiers
 }
 
 self.assertRetentionPeriod = (user, age) => {
@@ -327,7 +358,8 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
         file.path = file.chunksData.path
       } else {
         const length = self.parseFileIdentifierLength(req.headers.filelength)
-        file.filename = await self.getUniqueRandomName(length, file.extname)
+        const identifier = await self.getUniqueUploadIdentifier(length, file.extname, res)
+        file.filename = identifier + file.extname
         file.path = path.join(paths.uploads, file.filename)
       }
 
@@ -466,6 +498,7 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
     unlinkFiles(req.files)
     // If req.multipart() did not error out, but some file field did,
     // then Request connection was likely dropped
+    self.unholdUploadIdentifiers(res)
     return
   }
 
@@ -580,7 +613,8 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
     }
 
     const length = self.parseFileIdentifierLength(req.headers.filelength)
-    file.filename = await self.getUniqueRandomName(length, file.extname)
+    const identifier = await self.getUniqueUploadIdentifier(length, file.extname, res)
+    file.filename = identifier + file.extname
     file.path = path.join(paths.uploads, file.filename)
 
     let writeStream
@@ -758,7 +792,8 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
 
     // Generate name
     const length = self.parseFileIdentifierLength(file.filelength)
-    const name = await self.getUniqueRandomName(length, file.extname)
+    const identifier = await self.getUniqueUploadIdentifier(length, file.extname, res)
+    const name = identifier + file.extname
 
     // Move tmp file to final destination
     // For fs.copyFile(), tmpfile will eventually be unlinked by self.cleanUpChunks()
@@ -1048,14 +1083,6 @@ self.storeFilesToDb = async (req, res, user, filesData) => {
     // Insert new files to DB
     await utils.db.table('files').insert(files)
     utils.invalidateStatsCache('uploads')
-
-    if (config.uploads.queryDbForFileCollisions) {
-      for (const file of files) {
-        const extname = utils.extname(file.name)
-        const identifier = file.name.slice(0, -(extname.length))
-        self.onHold.delete(identifier)
-      }
-    }
 
     // Update albums' timestamp
     if (authorizedIds.length) {

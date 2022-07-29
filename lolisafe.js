@@ -76,7 +76,7 @@ if (Array.isArray(config.rateLimiters)) {
     }
   }
 } else if (config.rateLimits) {
-  logger.error('Config option "rateLimits" is deprecated.')
+  logger.error('Config option "rateLimits" is DEPRECATED.')
   logger.error('Please consult the provided sample file for the new option "rateLimiters".')
 }
 
@@ -301,16 +301,6 @@ safe.use('/api', api)
       utils.scan.instance = await new NodeClam().init(config.uploads.scan.clamOptions)
       utils.scan.version = await utils.scan.instance.getVersion().then(s => s.trim())
       logger.log(`Connection established with ${utils.scan.version}`)
-    }
-
-    // Cache file identifiers
-    if (config.uploads.cacheFileIdentifiers) {
-      utils.idSet = await utils.db.table('files')
-        .select('name')
-        .then(rows => {
-          return new Set(rows.map(row => row.name.split('.')[0]))
-        })
-      logger.log(`Cached ${utils.idSet.size} file identifiers`)
     }
 
     // Binds Express to port
