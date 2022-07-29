@@ -226,15 +226,14 @@ class ServeStatic {
     opts.start = offset
     opts.end = Math.max(offset, offset + len - 1)
 
-    // content-length
-    res.header('Content-Length', String(len))
-
     // HEAD support
     if (req.method === 'HEAD') {
+      // If HEAD, also set Content-Length (must be string)
+      res.header('Content-Length', String(len))
       return res.end()
     }
 
-    return this.#stream(req, res, fullPath, opts)
+    return this.#stream(req, res, fullPath, opts, len)
   }
 
   async #setHeaders (req, res, stat) {
@@ -264,7 +263,7 @@ class ServeStatic {
     }
   }
 
-  async #stream (req, res, fullPath, opts) {
+  async #stream (req, res, fullPath, opts, len) {
     const readStream = fs.createReadStream(fullPath, opts)
 
     readStream.on('error', error => {
@@ -272,7 +271,8 @@ class ServeStatic {
       logger.error(error)
     })
 
-    return res.stream(readStream)
+    // 2nd param will be set as Content-Length header (must be number)
+    return res.stream(readStream, len)
   }
 
   get handler () {
