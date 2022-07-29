@@ -210,6 +210,9 @@ module.exports = {
   */
   trustProxy: true,
 
+  // DEPRECATED: Please use "rateLimiters" option below instead.
+  // rateLimits: [],
+
   /*
     Rate limiters.
     https://github.com/animir/node-rate-limiter-flexible/wiki/Memory
@@ -379,20 +382,7 @@ module.exports = {
       '.svg'
     ],
 
-    /*
-      An array of allowed ages for uploads (in hours).
-
-      Default age will be the value at the very top of the array.
-      If the array is populated but do not have a zero value,
-      attempts to set permanent upload age will be rejected.
-
-      This only applies to new files uploaded AFTER enabling the option.
-      If disabled, any existing temporary uploads will not ever be automatically deleted,
-      since the safe assumes all uploads are permanent,
-      and thus will not start the periodical check up task.
-
-      DEPRECATED: Please use "retentionPeriods" option below instead.
-    */
+    // DEPRECATED: Please use "retentionPeriods" option below instead.
     // temporaryUploadAges: [],
 
     /*
@@ -565,6 +555,12 @@ module.exports = {
       default: 8,
       force: false
     },
+
+    // DEPRECATED: Please use "queryDatabaseForIdentifierMatch" option below instead.
+    // cacheFileIdentifiers: false,
+
+    // DEPRECATED: Please use "queryDatabaseForIdentifierMatch" option below instead.
+    // queryDbForFileCollisions: true,
 
     /*
       The service will query database on every new uploads,
