@@ -1,4 +1,5 @@
 const blake3 = require('blake3')
+const contentDisposition = require('content-disposition')
 const fetch = require('node-fetch')
 const fs = require('fs')
 const path = require('path')
@@ -572,23 +573,6 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
     }
     filesData.push(file)
 
-    file.originalname = path.basename(url).split(/[?#]/)[0]
-    file.extname = utils.extname(file.originalname)
-
-    // Extensions filter
-    let filtered = false
-    if (urlExtensionsFilter && ['blacklist', 'whitelist'].includes(config.uploads.urlExtensionsFilterMode)) {
-      const match = config.uploads.urlExtensionsFilter.includes(file.extname.toLowerCase())
-      const whitelist = config.uploads.urlExtensionsFilterMode === 'whitelist'
-      filtered = ((!whitelist && match) || (whitelist && !match))
-    } else {
-      filtered = self.isExtensionFiltered(file.extname)
-    }
-
-    if (filtered) {
-      throw new ClientError(`${file.extname ? `${file.extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
-    }
-
     if (config.uploads.urlProxy) {
       url = config.uploads.urlProxy
         .replace(/{url}/g, encodeURIComponent(url))
@@ -613,8 +597,10 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
     }
 
     const length = self.parseFileIdentifierLength(req.headers.filelength)
-    const identifier = await self.getUniqueUploadIdentifier(length, file.extname, res)
-    file.filename = identifier + file.extname
+    const identifier = await self.getUniqueUploadIdentifier(length, '.tmp', res)
+
+    // Temporarily store to disk as a .tmp file
+    file.filename = identifier + '.tmp'
     file.path = path.join(paths.uploads, file.filename)
 
     let writeStream
@@ -649,7 +635,51 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
       // Re-test size via actual bytes written to physical file
       assertSize(writeStream.bytesWritten)
 
-      // Finalize file props
+      // Try to determine filename from Content-Disposition header if available
+      const contentDispositionHeader = fetchFile.headers.get('content-disposition')
+      if (contentDispositionHeader) {
+        const parsed = contentDisposition.parse(contentDispositionHeader)
+        if (parsed && parsed.parameters) {
+          file.originalname = parsed.parameters.filename
+        }
+      }
+
+      if (!file.originalname) {
+        file.originalname = path.basename(url).split(/[?#]/)[0]
+      }
+
+      file.extname = utils.extname(file.originalname)
+
+      // Extensions filter
+      let filtered = false
+      if (urlExtensionsFilter && ['blacklist', 'whitelist'].includes(config.uploads.urlExtensionsFilterMode)) {
+        const match = config.uploads.urlExtensionsFilter.includes(file.extname.toLowerCase())
+        const whitelist = config.uploads.urlExtensionsFilterMode === 'whitelist'
+        filtered = ((!whitelist && match) || (whitelist && !match))
+      } else {
+        filtered = self.isExtensionFiltered(file.extname)
+      }
+
+      if (filtered) {
+        throw new ClientError(`${file.extname ? `${file.extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
+      }
+
+      // Generate a new filename with actual extname
+      // Also generate a new random identifier if required
+      const _identifier = queryDatabaseForIdentifierMatch
+        ? identifier
+        : await self.getUniqueUploadIdentifier(length, file.extname, res)
+      const _name = _identifier + file.extname
+
+      // Move .tmp file to the new filename
+      const destination = path.join(paths.uploads, _name)
+      await paths.rename(file.path, destination)
+
+      // Then update the props with renewed information
+      file.filename = _name
+      file.path = destination
+
+      // Finalize other file props
       const contentType = fetchFile.headers.get('content-type')
       file.mimetype = contentType ? contentType.split(';')[0] : 'application/octet-stream'
       file.size = writeStream.bytesWritten
