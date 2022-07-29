@@ -207,7 +207,7 @@ self.unholdUploadIdentifiers = res => {
 
   for (const identifier of res.locals.identifiers) {
     self.onHold.delete(identifier)
-    logger.debug(`Unhold identifier ${identifier}.`)
+    logger.debug(`Unheld identifier ${identifier}.`)
   }
 
   delete res.locals.identifiers
