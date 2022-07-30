@@ -22,7 +22,7 @@ const self = {
     // https://github.com/kelektiv/node.bcrypt.js/tree/v5.0.1#security-issues-and-concerns
     max: 64,
     // Length of randomized password
-    // when resetting passwordthrough Dashboard's Manage Users.
+    // when resetting password through Dashboard's Manage Users.
     rand: 16
   }
 }
