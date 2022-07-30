@@ -272,8 +272,12 @@ safe.use('/api', api)
         overrideContentTypes: config.overrideContentTypes,
         setContentDisposition: config.setContentDisposition
       })
+
       safe.get('/*', serveStaticInstance.handler)
       safe.head('/*', serveStaticInstance.handler)
+
+      // Keep reference to internal SimpleDataStore in utils,
+      // allowing the rest of lolisafe to directly interface with it
       utils.contentDispositionStore = serveStaticInstance.contentDispositionStore
     }
 
