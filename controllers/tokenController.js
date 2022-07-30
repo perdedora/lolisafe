@@ -3,17 +3,23 @@ const perms = require('./permissionController')
 const utils = require('./utilsController')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
+const logger = require('./../logger')
 
 const self = {
   tokenLength: 64,
   tokenMaxTries: 3,
-  onHold: new Set()
+
+  onHold: new Set() // temporarily held random tokens
 }
 
-self.generateUniqueToken = async () => {
+self.getUniqueToken = async res => {
   for (let i = 0; i < self.tokenMaxTries; i++) {
     const token = randomstring.generate(self.tokenLength)
-    if (self.onHold.has(token)) continue
+
+    if (self.onHold.has(token)) {
+      logger.debug(`Token ${utils.mask(token)} is currently held by another request (${i + 1}/${utils.idMaxTries}).`)
+      continue
+    }
 
     // Put token on-hold (wait for it to be inserted to DB)
     self.onHold.add(token)
@@ -24,13 +30,36 @@ self.generateUniqueToken = async () => {
       .first()
     if (user) {
       self.onHold.delete(token)
+      logger.debug(`User with token ${utils.mask(token)} already exists (${i + 1}/${utils.idMaxTries}).`)
       continue
+    }
+
+    // Unhold token once the Response has been sent
+    if (res) {
+      // Keep in an array for future-proofing
+      // if a single Request needs to generate multiple tokens
+      if (!res.locals.tokens) {
+        res.locals.tokens = []
+        res.once('finish', () => { self.unholdTokens(res) })
+      }
+      res.locals.tokens.push(token)
     }
 
     return token
   }
 
-  return null
+  throw new ServerError('Failed to allocate a unique token. Try again?')
+}
+
+self.unholdTokens = res => {
+  if (!res.locals.tokens) return
+
+  for (const token of res.locals.tokens) {
+    self.onHold.delete(token)
+    logger.debug(`Unheld token ${utils.mask(token)}.`)
+  }
+
+  delete res.locals.tokens
 }
 
 self.verify = async (req, res) => {
@@ -84,10 +113,7 @@ self.list = async (req, res) => {
 self.change = async (req, res) => {
   const user = await utils.authorize(req, 'token')
 
-  const newToken = await self.generateUniqueToken()
-  if (!newToken) {
-    throw new ServerError('Failed to allocate a unique token. Try again?')
-  }
+  const newToken = await self.getUniqueToken(res)
 
   await utils.db.table('users')
     .where('token', user.token)
@@ -95,7 +121,6 @@ self.change = async (req, res) => {
       token: newToken,
       timestamp: Math.floor(Date.now() / 1000)
     })
-  self.onHold.delete(newToken)
 
   return res.json({ success: true, token: newToken })
 }

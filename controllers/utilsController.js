@@ -362,7 +362,7 @@ self.escape = string => {
 }
 
 self.stripIndents = string => {
-  if (!string) return
+  if (!string) return string
   const result = string.replace(/^[^\S\n]+/gm, '')
   const match = result.match(/^[^\S\n]*(?=\S)/gm)
   const indent = match && Math.min(...match.map(el => el.length))
@@ -371,6 +371,19 @@ self.stripIndents = string => {
     return result.replace(regexp, '')
   }
   return result
+}
+
+self.mask = string => {
+  if (!string) return string
+  const max = Math.min(Math.floor(string.length / 2), 8)
+  const fragment = Math.floor(max / 2)
+  if (string.length <= fragment) {
+    return '*'.repeat(string.length)
+  } else {
+    return string.substring(0, fragment) +
+      '*'.repeat(Math.min(string.length - (fragment * 2), 4)) +
+      string.substring(string.length - fragment)
+  }
 }
 
 self.assertRequestType = (req, type) => {

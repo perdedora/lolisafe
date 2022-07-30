@@ -6,7 +6,6 @@ const perms = require('./permissionController')
 const tokens = require('./tokenController')
 const utils = require('./utilsController')
 const ClientError = require('./utils/ClientError')
-const ServerError = require('./utils/ServerError')
 const config = require('./../config')
 
 // Don't forget to update min/max length of text inputs in auth.njk
@@ -96,10 +95,7 @@ self.register = async (req, res) => {
 
   const hash = await bcrypt.hash(password, saltRounds)
 
-  const token = await tokens.generateUniqueToken()
-  if (!token) {
-    throw new ServerError('Failed to allocate a unique token. Try again?')
-  }
+  const token = await tokens.getUniqueToken(res)
 
   await utils.db.table('users')
     .insert({
@@ -110,8 +106,8 @@ self.register = async (req, res) => {
       permission: perms.permissions.user,
       registration: Math.floor(Date.now() / 1000)
     })
+
   utils.invalidateStatsCache('users')
-  tokens.onHold.delete(token)
 
   return res.json({ success: true, token })
 }
@@ -195,10 +191,7 @@ self.createUser = async (req, res) => {
 
   const hash = await bcrypt.hash(password, saltRounds)
 
-  const token = await tokens.generateUniqueToken()
-  if (!token) {
-    throw new ServerError('Failed to allocate a unique token. Try again?')
-  }
+  const token = await tokens.getUniqueToken(res)
 
   await utils.db.table('users')
     .insert({
@@ -209,8 +202,8 @@ self.createUser = async (req, res) => {
       permission,
       registration: Math.floor(Date.now() / 1000)
     })
+
   utils.invalidateStatsCache('users')
-  tokens.onHold.delete(token)
 
   return res.json({ success: true, username, password, group })
 }
