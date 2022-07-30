@@ -17,7 +17,7 @@ const self = {
   titleMaxLength: 70,
   descMaxLength: 4000,
 
-  onHold: new Set()
+  onHold: new Set() // temporarily held random album identifiers
 }
 
 const homeDomain = utils.conf.homeDomain || utils.conf.domain
@@ -45,10 +45,14 @@ class ZipEmitter extends EventEmitter {
   }
 }
 
-self.getUniqueRandomName = async () => {
+self.getUniqueAlbumIdentifier = async res => {
   for (let i = 0; i < utils.idMaxTries; i++) {
     const identifier = randomstring.generate(config.uploads.albumIdentifierLength)
-    if (self.onHold.has(identifier)) continue
+
+    if (self.onHold.has(identifier)) {
+      logger.log(`Identifier ${identifier} is currently held by another album (${i + 1}/${utils.idMaxTries}).`)
+      continue
+    }
 
     // Put token on-hold (wait for it to be inserted to DB)
     self.onHold.add(identifier)
@@ -63,10 +67,30 @@ self.getUniqueRandomName = async () => {
       continue
     }
 
+    // Unhold identifier once the Response has been sent
+    if (res) {
+      if (!res.locals.identifiers) {
+        res.locals.identifiers = []
+        res.once('finish', () => { self.unholdAlbumIdentifiers(res) })
+      }
+      res.locals.identifiers.push(identifier)
+    }
+
     return identifier
   }
 
   throw new ServerError('Failed to allocate a unique identifier for the album. Try again?')
+}
+
+self.unholdAlbumIdentifiers = res => {
+  if (!res.locals.identifiers) return
+
+  for (const identifier of res.locals.identifiers) {
+    self.onHold.delete(identifier)
+    logger.debug(`Unheld identifier ${identifier}.`)
+  }
+
+  delete res.locals.identifiers
 }
 
 self.list = async (req, res) => {
@@ -211,7 +235,7 @@ self.create = async (req, res) => {
 
   if (album) throw new ClientError('Album name already in use.', { statusCode: 403 })
 
-  const identifier = await self.getUniqueRandomName()
+  const identifier = await self.getUniqueAlbumIdentifier(res)
 
   const ids = await utils.db.table('albums').insert({
     name,
@@ -227,8 +251,8 @@ self.create = async (req, res) => {
       ? utils.escape(req.body.description.trim().substring(0, self.descMaxLength))
       : ''
   })
+
   utils.invalidateStatsCache('albums')
-  self.onHold.delete(identifier)
 
   return res.json({ success: true, id: ids[0] })
 }
@@ -392,18 +416,17 @@ self.edit = async (req, res) => {
   }
 
   if (req.body.requestLink) {
-    update.identifier = await self.getUniqueRandomName()
+    update.identifier = await self.getUniqueAlbumIdentifier(res)
   }
 
   await utils.db.table('albums')
     .where(filter)
     .update(update)
+
   utils.deleteStoredAlbumRenders([id])
   utils.invalidateStatsCache('albums')
 
   if (req.body.requestLink) {
-    self.onHold.delete(update.identifier)
-
     // Rename zip archive of the album if it exists
     try {
       const oldZip = path.join(paths.zips, `${album.identifier}.zip`)
