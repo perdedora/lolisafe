@@ -50,7 +50,7 @@ self.getUniqueAlbumIdentifier = async res => {
     const identifier = randomstring.generate(config.uploads.albumIdentifierLength)
 
     if (self.onHold.has(identifier)) {
-      logger.log(`Identifier ${identifier} is currently held by another album (${i + 1}/${utils.idMaxTries}).`)
+      logger.debug(`Identifier ${identifier} is currently held by another album (${i + 1}/${utils.idMaxTries}).`)
       continue
     }
 
@@ -63,12 +63,14 @@ self.getUniqueAlbumIdentifier = async res => {
       .first()
     if (album) {
       self.onHold.delete(identifier)
-      logger.log(`Album with identifier ${identifier} already exists (${i + 1}/${utils.idMaxTries}).`)
+      logger.debug(`Album with identifier ${identifier} already exists (${i + 1}/${utils.idMaxTries}).`)
       continue
     }
 
     // Unhold identifier once the Response has been sent
     if (res) {
+      // Keep in an array for future-proofing
+      // if a single Request needs to generate multiple album identifiers
       if (!res.locals.identifiers) {
         res.locals.identifiers = []
         res.once('finish', () => { self.unholdAlbumIdentifiers(res) })

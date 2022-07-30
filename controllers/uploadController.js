@@ -157,7 +157,7 @@ self.getUniqueUploadIdentifier = async (length, extension = '', res) => {
     if (queryDatabaseForIdentifierMatch) {
       // If must query database for identifiers matches
       if (self.onHold.has(identifier)) {
-        logger.log(`Identifier ${identifier} is currently held by another upload (${i + 1}/${utils.idMaxTries}).`)
+        logger.debug(`Identifier ${identifier} is currently held by another upload (${i + 1}/${utils.idMaxTries}).`)
         continue
       }
 
@@ -170,7 +170,7 @@ self.getUniqueUploadIdentifier = async (length, extension = '', res) => {
         .first()
       if (file) {
         self.onHold.delete(identifier)
-        logger.log(`Identifier ${identifier} is already in use (${i + 1}/${utils.idMaxTries}).`)
+        logger.debug(`Identifier ${identifier} is already in use (${i + 1}/${utils.idMaxTries}).`)
         continue
       }
 
@@ -187,7 +187,7 @@ self.getUniqueUploadIdentifier = async (length, extension = '', res) => {
       try {
         const name = identifier + extension
         await paths.access(path.join(paths.uploads, name))
-        logger.log(`${name} is already in use (${i + 1}/${utils.idMaxTries}).`)
+        logger.debug(`${name} is already in use (${i + 1}/${utils.idMaxTries}).`)
         continue
       } catch (error) {
         // Re-throw non-ENOENT error
