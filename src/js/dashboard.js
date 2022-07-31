@@ -674,7 +674,7 @@ page.getUploads = (params = {}) => {
       .replace(/(data-action="page-ellipsis")/g, `$1 data-jumpid="${bottomJumpId}"`)
 
     // Whether there are any unselected items
-    let unselected = true
+    let unselected = false
 
     const showOriginalNames = page.views[page.currentView].originalNames
     const hasExpiryDateColumn = files.some(file => typeof file.expirydate !== 'undefined')
@@ -723,8 +723,8 @@ page.getUploads = (params = {}) => {
 
       // Update selected status
       files[i].selected = page.selected[page.currentView].includes(files[i].id)
-      if (files[i].selected) {
-        unselected = false
+      if (!files[i].selected) {
+        unselected = true
       }
 
       // Appendix (display album or user)
@@ -893,7 +893,7 @@ page.getUploads = (params = {}) => {
     }
 
     const selectAll = document.querySelector('#selectAll')
-    if (selectAll && !unselected) {
+    if (files.length && selectAll && !unselected) {
       selectAll.checked = true
       selectAll.title = 'Unselect all'
     }
@@ -1730,7 +1730,7 @@ page.getAlbums = (params = {}) => {
       .replace(/(data-action="page-ellipsis")/g, `$1 data-jumpid="${bottomJumpId}"`)
 
     // Whether there are any unselected items
-    let unselected = true
+    let unselected = false
 
     const createNewAlbum = `
       <h2 class="subtitle">Create new album</h2>
@@ -1801,8 +1801,8 @@ page.getAlbums = (params = {}) => {
       const albumUrl = homeDomain + albumUrlText
 
       const selected = page.selected[page.currentView].includes(album.id)
-      if (selected) {
-        unselected = false
+      if (!selected) {
+        unselected = true
       }
 
       // Prettify
@@ -1879,7 +1879,7 @@ page.getAlbums = (params = {}) => {
     }
 
     const selectAll = document.querySelector('#selectAll')
-    if (selectAll && !unselected) {
+    if (albums.length && selectAll && !unselected) {
       selectAll.checked = true
       selectAll.title = 'Unselect all'
     }
@@ -2507,7 +2507,7 @@ page.getUsers = (params = {}) => {
       .replace(/(data-action="page-ellipsis")/g, `$1 data-jumpid="${bottomJumpId}"`)
 
     // Whether there are any unselected items
-    let unselected = true
+    let unselected = false
 
     page.dom.innerHTML = `
       ${pagination}
@@ -2541,8 +2541,8 @@ page.getUsers = (params = {}) => {
     for (let i = 0; i < users.length; i++) {
       const user = users[i]
       const selected = page.selected[page.currentView].includes(user.id)
-      if (selected) {
-        unselected = false
+      if (!selected) {
+        unselected = true
       }
 
       let displayGroup = null
@@ -2607,7 +2607,7 @@ page.getUsers = (params = {}) => {
     }
 
     const selectAll = document.querySelector('#selectAll')
-    if (selectAll && !unselected) {
+    if (users.length && selectAll && !unselected) {
       selectAll.checked = true
       selectAll.title = 'Unselect all'
     }
