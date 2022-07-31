@@ -255,6 +255,10 @@ class ServeStatic {
       return res.end()
     }
 
+    if (len === 0) {
+      res.end()
+    }
+
     return this.#stream(req, res, fullPath, opts, len)
   }
 
