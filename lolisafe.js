@@ -47,6 +47,7 @@ const ExpressCompat = require('./controllers/middlewares/ExpressCompat')
 const NunjucksRenderer = require('./controllers/middlewares/NunjucksRenderer')
 const RateLimiter = require('./controllers/middlewares/RateLimiter')
 const ServeLiveDirectory = require('./controllers/middlewares/ServeLiveDirectory')
+const ServeStaticQuick = require('./controllers/middlewares/ServeStaticQuick')
 
 // Handlers
 const ServeStatic = require('./controllers/handlers/ServeStatic')
@@ -190,17 +191,17 @@ if (config.cacheControl) {
   })
 }
 
-// Init LiveDirectory middlewares for static assets
+// Init ServeStaticQuick middlewares for static assets
 // Static assets in /public directory
-const serveLiveDirectoryPublicInstance = new ServeLiveDirectory(paths.public, {
+const serveStaticQuickPublicInstance = new ServeStaticQuick(paths.public, {
   setHeaders: setHeadersForStaticAssets
 })
-safe.use(serveLiveDirectoryPublicInstance.middleware)
+safe.use(serveStaticQuickPublicInstance.middleware)
 // Static assets in /dist directory
-const serveLiveDirectoryDistInstance = new ServeLiveDirectory(paths.dist, {
+const serveStaticQuickDistInstance = new ServeStaticQuick(paths.dist, {
   setHeaders: setHeadersForStaticAssets
 })
-safe.use(serveLiveDirectoryDistInstance.middleware)
+safe.use(serveStaticQuickDistInstance.middleware)
 
 // Routes
 safe.use(album)
@@ -309,6 +310,13 @@ safe.use('/api', api)
       utils.scan.version = await utils.scan.instance.getVersion().then(s => s.trim())
       logger.log(`Connection established with ${utils.scan.version}`)
     }
+
+    // Await all ServeLiveDirectory and ServeStaticQuick instances
+    await Promise.all([
+      serveStaticQuickDistInstance.ready(),
+      serveStaticQuickPublicInstance.ready(),
+      serveLiveDirectoryCustomPagesInstance.ready()
+    ])
 
     // Binds Express to port
     await safe.listen(utils.conf.port)

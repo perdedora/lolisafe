@@ -95,6 +95,11 @@ class ServeLiveDirectory {
     return res.send(file.buffer)
   }
 
+  ready () {
+    // Returns a promise which resolves to true once LiveDirectory instance is ready
+    return this.instance.ready()
+  }
+
   #middleware (req, res, next) {
     // Only process GET and HEAD requests
     if (req.method !== 'GET' && req.method !== 'HEAD') {
