@@ -656,6 +656,15 @@ module.exports = {
   },
 
   /*
+    Dashboard config.
+  */
+  dashboard: {
+    uploadsPerPage: 24,
+    albumsPerPage: 10,
+    usersPerPage: 10
+  },
+
+  /*
     Cloudflare support.
   */
   cloudflare: {

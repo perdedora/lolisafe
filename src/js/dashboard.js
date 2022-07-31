@@ -545,7 +545,8 @@ page.getUploads = (params = {}) => {
       }
     }
 
-    const pages = Math.ceil(response.data.count / 25)
+    const uploadsPerPage = response.data.uploadsPerPage || 25
+    const pages = Math.ceil(response.data.count / uploadsPerPage)
     const files = response.data.files
     if (params.pageNum && (files.length === 0)) {
       page.updateTrigger(params.trigger)
@@ -564,8 +565,10 @@ page.getUploads = (params = {}) => {
     const users = response.data.users
     const basedomain = response.data.basedomain
 
-    if (params.pageNum < 0) params.pageNum = Math.max(0, pages + params.pageNum)
-    const pagination = page.paginate(response.data.count, 25, params.pageNum)
+    if (params.pageNum < 0) {
+      params.pageNum = Math.max(0, pages + params.pageNum)
+    }
+    const pagination = page.paginate(response.data.count, uploadsPerPage, params.pageNum)
 
     const filter = `
       <div class="column">
@@ -671,7 +674,7 @@ page.getUploads = (params = {}) => {
       .replace(/(data-action="page-ellipsis")/g, `$1 data-jumpid="${bottomJumpId}"`)
 
     // Whether there are any unselected items
-    let unselected = false
+    let unselected = true
 
     const showOriginalNames = page.views[page.currentView].originalNames
     const hasExpiryDateColumn = files.some(file => typeof file.expirydate !== 'undefined')
@@ -720,7 +723,9 @@ page.getUploads = (params = {}) => {
 
       // Update selected status
       files[i].selected = page.selected[page.currentView].includes(files[i].id)
-      if (!files[i].selected) unselected = true
+      if (files[i].selected) {
+        unselected = false
+      }
 
       // Appendix (display album or user)
       if (params.all) {
@@ -888,7 +893,7 @@ page.getUploads = (params = {}) => {
     }
 
     const selectAll = document.querySelector('#selectAll')
-    if (selectAll && !unselected && files.length) {
+    if (selectAll && !unselected) {
       selectAll.checked = true
       selectAll.title = 'Unselect all'
     }
@@ -1615,7 +1620,8 @@ page.getAlbums = (params = {}) => {
       }
     }
 
-    const pages = Math.ceil(response.data.count / 25)
+    const albumsPerPage = response.data.albumsPerPage || 25
+    const pages = Math.ceil(response.data.count / albumsPerPage)
     const albums = response.data.albums
     if (params.pageNum && (albums.length === 0)) {
       page.updateTrigger(params.trigger)
@@ -1633,8 +1639,10 @@ page.getAlbums = (params = {}) => {
     const users = response.data.users
     const homeDomain = response.data.homeDomain || window.location.origin
 
-    if (params.pageNum < 0) params.pageNum = Math.max(0, pages + params.pageNum)
-    const pagination = page.paginate(response.data.count, 25, params.pageNum)
+    if (params.pageNum < 0) {
+      params.pageNum = Math.max(0, pages + params.pageNum)
+    }
+    const pagination = page.paginate(response.data.count, albumsPerPage, params.pageNum)
 
     const filter = `
       <div class="column">
@@ -1722,7 +1730,7 @@ page.getAlbums = (params = {}) => {
       .replace(/(data-action="page-ellipsis")/g, `$1 data-jumpid="${bottomJumpId}"`)
 
     // Whether there are any unselected items
-    let unselected = false
+    let unselected = true
 
     const createNewAlbum = `
       <h2 class="subtitle">Create new album</h2>
@@ -1793,7 +1801,9 @@ page.getAlbums = (params = {}) => {
       const albumUrl = homeDomain + albumUrlText
 
       const selected = page.selected[page.currentView].includes(album.id)
-      if (!selected) unselected = true
+      if (selected) {
+        unselected = false
+      }
 
       // Prettify
       album.hasZip = album.zipSize !== null
@@ -2386,7 +2396,8 @@ page.getUsers = (params = {}) => {
       }
     }
 
-    const pages = Math.ceil(response.data.count / 25)
+    const usersPerPage = response.data.usersPerPage || 25
+    const pages = Math.ceil(response.data.count / usersPerPage)
     const users = response.data.users
     if (params.pageNum && (users.length === 0)) {
       page.updateTrigger(params.trigger)
@@ -2401,8 +2412,10 @@ page.getUsers = (params = {}) => {
     page.currentView = 'users'
     page.cache = {}
 
-    if (params.pageNum < 0) params.pageNum = Math.max(0, pages + params.pageNum)
-    const pagination = page.paginate(response.data.count, 25, params.pageNum)
+    if (params.pageNum < 0) {
+      params.pageNum = Math.max(0, pages + params.pageNum)
+    }
+    const pagination = page.paginate(response.data.count, usersPerPage, params.pageNum)
 
     const filter = `
       <div class="column">
@@ -2494,7 +2507,7 @@ page.getUsers = (params = {}) => {
       .replace(/(data-action="page-ellipsis")/g, `$1 data-jumpid="${bottomJumpId}"`)
 
     // Whether there are any unselected items
-    let unselected = false
+    let unselected = true
 
     page.dom.innerHTML = `
       ${pagination}
@@ -2528,7 +2541,9 @@ page.getUsers = (params = {}) => {
     for (let i = 0; i < users.length; i++) {
       const user = users[i]
       const selected = page.selected[page.currentView].includes(user.id)
-      if (!selected) unselected = true
+      if (selected) {
+        unselected = false
+      }
 
       let displayGroup = null
       const groups = Object.keys(user.groups)

@@ -26,8 +26,14 @@ const self = {
   }
 }
 
+/** Preferences */
+
 // https://github.com/kelektiv/node.bcrypt.js/tree/v5.0.1#a-note-on-rounds
 const saltRounds = 10
+
+const usersPerPage = config.dashboard
+  ? Math.max(Math.min(config.dashboard.usersPerPage || 0, 100), 1)
+  : 25
 
 self.verify = async (req, res) => {
   utils.assertRequestType(req, 'application/json')
@@ -360,24 +366,30 @@ self.listUsers = async (req, res) => {
   const isadmin = perms.is(user, 'admin')
   if (!isadmin) throw new ClientError('', { statusCode: 403 })
 
-  const count = await utils.db.table('users')
+  // Base result object
+  const result = { success: true, users: [], usersPerPage, count: 0 }
+
+  result.count = await utils.db.table('users')
     .count('id as count')
     .then(rows => rows[0].count)
-  if (!count) {
-    return res.json({ success: true, users: [], count })
+  if (!result.count) {
+    return res.json(result)
   }
 
   let offset = req.path_parameters && Number(req.path_parameters.page)
-  if (isNaN(offset)) offset = 0
-  else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
+  if (isNaN(offset)) {
+    offset = 0
+  } else if (offset < 0) {
+    offset = Math.max(0, Math.ceil(result.count / usersPerPage) + offset)
+  }
 
-  const users = await utils.db.table('users')
-    .limit(25)
-    .offset(25 * offset)
+  result.users = await utils.db.table('users')
+    .limit(usersPerPage)
+    .offset(usersPerPage * offset)
     .select('id', 'username', 'enabled', 'timestamp', 'permission', 'registration')
 
   const pointers = {}
-  for (const user of users) {
+  for (const user of result.users) {
     user.groups = perms.mapPermissions(user)
     delete user.permission
     user.uploads = 0
@@ -394,7 +406,7 @@ self.listUsers = async (req, res) => {
     pointers[upload.userid].usage += parseInt(upload.size)
   }
 
-  return res.json({ success: true, users, count })
+  return res.json(result)
 }
 
 module.exports = self

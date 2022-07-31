@@ -20,7 +20,13 @@ const self = {
   onHold: new Set() // temporarily held random album identifiers
 }
 
+/** Preferences */
+
 const homeDomain = utils.conf.homeDomain || utils.conf.domain
+
+const albumsPerPage = config.dashboard
+  ? Math.max(Math.min(config.dashboard.albumsPerPage || 0, 100), 1)
+  : 25
 
 const zipMaxTotalSize = parseInt(config.cloudflare.zipMaxTotalSize)
 const zipMaxTotalSizeBytes = zipMaxTotalSize * 1e6
@@ -112,41 +118,48 @@ self.list = async (req, res) => {
     }
   }
 
+  // Base result object
+  const result = { success: true, albums: [], albumsPerPage, count: 0, homeDomain }
+
   // Query albums count for pagination
-  const count = await utils.db.table('albums')
+  result.count = await utils.db.table('albums')
     .where(filter)
     .count('id as count')
     .then(rows => rows[0].count)
-  if (!count) {
-    return res.json({ success: true, albums: [], count })
+  if (!result.count) {
+    return res.json(result)
   }
 
   const fields = ['id', 'name']
 
-  let albums
   if (simple) {
-    albums = await utils.db.table('albums')
+    result.albums = await utils.db.table('albums')
       .where(filter)
       .select(fields)
 
-    return res.json({ success: true, albums, count })
-  } else {
-    let offset = req.path_parameters && Number(req.path_parameters.page)
-    if (isNaN(offset)) offset = 0
-    else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
-
-    fields.push('identifier', 'enabled', 'timestamp', 'editedAt', 'zipGeneratedAt', 'download', 'public', 'description')
-    if (all) fields.push('userid')
-
-    albums = await utils.db.table('albums')
-      .where(filter)
-      .limit(25)
-      .offset(25 * offset)
-      .select(fields)
+    return res.json(result)
   }
 
+  let offset = req.path_parameters && Number(req.path_parameters.page)
+  if (isNaN(offset)) {
+    offset = 0
+  } else if (offset < 0) {
+    offset = Math.max(0, Math.ceil(result.count / albumsPerPage) + offset)
+  }
+
+  fields.push('identifier', 'enabled', 'timestamp', 'editedAt', 'zipGeneratedAt', 'download', 'public', 'description')
+  if (all) {
+    fields.push('userid')
+  }
+
+  result.albums = await utils.db.table('albums')
+    .where(filter)
+    .limit(albumsPerPage)
+    .offset(albumsPerPage * offset)
+    .select(fields)
+
   const albumids = {}
-  for (const album of albums) {
+  for (const album of result.albums) {
     album.download = album.download !== 0
     album.public = album.public !== 0
     album.uploads = 0
@@ -171,7 +184,7 @@ self.list = async (req, res) => {
     }
   }
 
-  await Promise.all(albums.map(album => getAlbumZipSize(album)))
+  await Promise.all(result.albums.map(album => getAlbumZipSize(album)))
 
   const uploads = await utils.db.table('files')
     .whereIn('albumid', Object.keys(albumids))
@@ -186,19 +199,17 @@ self.list = async (req, res) => {
 
   // If we are not listing all albums, send response
   if (!all) {
-    return res.json({ success: true, albums, count, homeDomain })
+    return res.json(result)
   }
 
   // Otherwise proceed to querying usernames
-  const userids = albums
+  const userids = result.albums
     .map(album => album.userid)
-    .filter((v, i, a) => {
-      return v !== null && v !== undefined && v !== '' && a.indexOf(v) === i
-    })
+    .filter(utils.filterUniquifySqlArray)
 
   // If there are no albums attached to a registered user, send response
   if (!userids.length) {
-    return res.json({ success: true, albums, count, homeDomain })
+    return res.json(result)
   }
 
   // Query usernames of user IDs from currently selected files
@@ -206,12 +217,13 @@ self.list = async (req, res) => {
     .whereIn('id', userids)
     .select('id', 'username')
 
-  const users = {}
+  result.users = {}
+
   for (const user of usersTable) {
-    users[user.id] = user.username
+    result.users[user.id] = user.username
   }
 
-  return res.json({ success: true, albums, count, users, homeDomain })
+  return res.json(result)
 }
 
 self.create = async (req, res) => {

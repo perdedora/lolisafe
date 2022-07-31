@@ -62,6 +62,10 @@ const enableHashing = config.uploads.hash === undefined
 const queryDatabaseForIdentifierMatch = config.uploads.queryDatabaseForIdentifierMatch ||
   config.uploads.queryDbForFileCollisions // old config name for identical behavior
 
+const uploadsPerPage = config.dashboard
+  ? Math.max(Math.min(config.dashboard.uploadsPerPage || 0, 100), 1)
+  : 25
+
 /** Chunks helper class & function **/
 
 class ChunksData {
@@ -1686,18 +1690,24 @@ self.list = async (req, res) => {
     })
   }
 
+  // Base result object
+  const result = { success: true, files: [], uploadsPerPage, count: 0, basedomain }
+
   // Query uploads count for pagination
-  const count = await utils.db.table('files')
+  result.count = await utils.db.table('files')
     .where(filter)
     .count('id as count')
     .then(rows => rows[0].count)
-  if (!count) {
-    return res.json({ success: true, files: [], count })
+  if (!result.count) {
+    return res.json(result)
   }
 
   let offset = req.path_parameters && Number(req.path_parameters.page)
-  if (isNaN(offset)) offset = 0
-  else if (offset < 0) offset = Math.max(0, Math.ceil(count / 25) + offset)
+  if (isNaN(offset)) {
+    offset = 0
+  } else if (offset < 0) {
+    offset = Math.max(0, Math.ceil(result.count / uploadsPerPage) + offset)
+  }
 
   const columns = ['id', 'name', 'original', 'userid', 'size', 'timestamp']
   if (utils.retentions.enabled) columns.push('expirydate')
@@ -1724,33 +1734,33 @@ self.list = async (req, res) => {
     orderByRaw = '`id` desc'
   }
 
-  const files = await utils.db.table('files')
+  result.files = await utils.db.table('files')
     .where(filter)
     .orderByRaw(orderByRaw)
-    .limit(25)
-    .offset(25 * offset)
+    .limit(uploadsPerPage)
+    .offset(uploadsPerPage * offset)
     .select(columns)
 
-  if (!files.length) {
-    return res.json({ success: true, files, count, basedomain })
+  if (!result.files.length) {
+    return res.json(result)
   }
 
-  for (const file of files) {
+  for (const file of result.files) {
     file.extname = utils.extname(file.name)
     if (utils.mayGenerateThumb(file.extname)) {
       file.thumb = `thumbs/${file.name.slice(0, -file.extname.length)}.png`
     }
   }
 
+  result.albums = {}
+
   // If we queried albumid, query album names
-  let albums = {}
   if (columns.includes('albumid')) {
-    const albumids = files
+    const albumids = result.files
       .map(file => file.albumid)
-      .filter((v, i, a) => {
-        return v !== null && v !== undefined && v !== '' && a.indexOf(v) === i
-      })
-    albums = await utils.db.table('albums')
+      .filter(utils.filterUniquifySqlArray)
+
+    result.albums = await utils.db.table('albums')
       .whereIn('id', albumids)
       .where('enabled', 1)
       .select('id', 'name')
@@ -1766,21 +1776,18 @@ self.list = async (req, res) => {
 
   // If we are not listing all uploads, send response
   if (!all) {
-    return res.json({ success: true, files, count, albums, basedomain })
+    return res.json(result)
   }
-
   // Otherwise proceed to querying usernames
   let usersTable = filterObj.uploaders
   if (!usersTable.length) {
-    const userids = files
+    const userids = result.files
       .map(file => file.userid)
-      .filter((v, i, a) => {
-        return v !== null && v !== undefined && v !== '' && a.indexOf(v) === i
-      })
+      .filter(utils.filterUniquifySqlArray)
 
     // If there are no uploads attached to a registered user, send response
     if (!userids.length) {
-      return res.json({ success: true, files, count, albums, basedomain })
+      return res.json(result)
     }
 
     // Query usernames of user IDs from currently selected files
@@ -1789,12 +1796,13 @@ self.list = async (req, res) => {
       .select('id', 'username')
   }
 
-  const users = {}
+  result.users = {}
+
   for (const user of usersTable) {
-    users[user.id] = user.username
+    result.users[user.id] = user.username
   }
 
-  return res.json({ success: true, files, count, users, albums, basedomain })
+  return res.json(result)
 }
 
 /** Get file info */

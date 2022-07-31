@@ -386,6 +386,13 @@ self.mask = string => {
   }
 }
 
+self.filterUniquifySqlArray = (value, index, array) => {
+  return value !== null &&
+    value !== undefined &&
+    value !== '' &&
+    array.indexOf(value) === index
+}
+
 self.assertRequestType = (req, type) => {
   if (!req.is(type)) {
     throw new ClientError(`Request Content-Type must be ${type}.`)
