@@ -62,29 +62,16 @@ class ServeLiveDirectory {
     this.#options = options
   }
 
-  /*
-   * Based on https://github.com/pillarjs/send/blob/0.18.0/index.js
-   * Copyright(c) 2012 TJ Holowaychuk
-   * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   */
-
   handler (req, res, file) {
-    // set content-type
+    // Set Content-Type
     res.type(file.extension)
 
-    // set header fields
+    // Set header fields
     this.#setHeaders(req, res, file)
 
-    // conditional GET support
-    if (serveUtils.isConditionalGET(req)) {
-      if (serveUtils.isPreconditionFailure(req, res)) {
-        return res.status(412).end()
-      }
-
-      if (serveUtils.isFresh(req, res)) {
-        return res.status(304).end()
-      }
+    // Conditional GET support
+    if (serveUtils.assertConditionalGET(req, res)) {
+      return res.end()
     }
 
     // HEAD support

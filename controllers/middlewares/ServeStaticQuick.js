@@ -22,7 +22,6 @@
 const chokidar = require('chokidar')
 const etag = require('etag')
 const fs = require('fs')
-const parseRange = require('range-parser')
 const serveUtils = require('./../utils/serveUtils')
 const logger = require('./../../logger')
 
@@ -78,94 +77,33 @@ class ServeStaticQuick {
     this.#options = options
   }
 
-  /*
-   * Based on https://github.com/pillarjs/send/blob/0.18.0/index.js
-   * Copyright(c) 2012 TJ Holowaychuk
-   * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   */
-
   handler (req, res, stat) {
-    // ReadStream options
-    let len = stat.size
-    const opts = {}
-    let ranges = req.headers.range
-    let offset = 0
-
-    // set content-type
+    // Set Content-Type
     res.type(req.path)
 
-    // set header fields
+    // Set header fields
     this.#setHeaders(req, res, stat)
 
-    // conditional GET support
-    if (serveUtils.isConditionalGET(req)) {
-      if (serveUtils.isPreconditionFailure(req, res)) {
-        return res.status(412).end()
-      }
-
-      if (serveUtils.isFresh(req, res)) {
-        return res.status(304).end()
-      }
+    // Conditional GET support
+    if (serveUtils.assertConditionalGET(req, res)) {
+      return res.end()
     }
 
-    // adjust len to start/end options
-    len = Math.max(0, len - offset)
-    if (opts.end !== undefined) {
-      const bytes = opts.end - offset + 1
-      if (len > bytes) len = bytes
-    }
-
-    // Range support
-    if (this.#options.acceptRanges && serveUtils.BYTES_RANGE_REGEXP.test(ranges)) {
-      // parse
-      ranges = parseRange(len, ranges, {
-        combine: true
-      })
-
-      // If-Range support
-      if (!serveUtils.isRangeFresh(req, res)) {
-        // range stale
-        ranges = -2
-      }
-
-      // unsatisfiable
-      if (ranges === -1) {
-        // Content-Range
-        res.header('Content-Range', serveUtils.contentRange('bytes', len))
-
-        // 416 Requested Range Not Satisfiable
-        return res.status(416).end()
-      }
-
-      // valid (syntactically invalid/multiple ranges are treated as a regular response)
-      if (ranges !== -2 && ranges.length === 1) {
-        // Content-Range
-        res.status(206)
-        res.header('Content-Range', serveUtils.contentRange('bytes', len, ranges[0]))
-
-        // adjust for requested range
-        offset += ranges[0].start
-        len = ranges[0].end - ranges[0].start + 1
-      }
-    }
-
-    // set read options
-    opts.start = offset
-    opts.end = Math.max(offset, offset + len - 1)
+    // ReadStream options with Content-Range support if required
+    const { options, length } = serveUtils.buildReadStreamOptions(req, res, stat, this.#options.acceptRanges)
 
     // HEAD support
     if (req.method === 'HEAD') {
       // If HEAD, also set Content-Length (must be string)
-      res.header('Content-Length', String(len))
+      res.header('Content-Length', String(length))
       return res.end()
     }
 
-    if (len === 0) {
+    if (length === 0) {
       res.end()
     }
 
-    return this.#stream(req, res, stat, opts, len)
+    return this.#stream(req, res, stat, options, length)
   }
 
   // Returns a promise which resolves to true once ServeStaticQuick is ready
@@ -174,7 +112,9 @@ class ServeStaticQuick {
     if (this.#readyPromise === true) return Promise.resolve(true)
 
     // Create a promise if one does not exist for ready event
-    if (this.#readyPromise === undefined) { this.#readyPromise = new Promise((resolve) => (this.#readyResolve = resolve)) }
+    if (this.#readyPromise === undefined) {
+      this.#readyPromise = new Promise((resolve) => (this.#readyResolve = resolve))
+    }
 
     return this.#readyPromise
   }
@@ -255,9 +195,9 @@ class ServeStaticQuick {
     }
   }
 
-  #stream (req, res, stat, opts, len) {
+  #stream (req, res, stat, options, length) {
     const fullPath = this.directory + req.path
-    const readStream = fs.createReadStream(fullPath, opts)
+    const readStream = fs.createReadStream(fullPath, options)
 
     readStream.on('error', error => {
       readStream.destroy()
@@ -265,7 +205,7 @@ class ServeStaticQuick {
     })
 
     // 2nd param will be set as Content-Length header (must be number)
-    return res.stream(readStream, len)
+    return res.stream(readStream, length)
   }
 
   get middleware () {
