@@ -190,12 +190,12 @@ if (config.cacheControl) {
 
 // Init LiveDirectory middlewares for static assets
 // Static assets in /public directory
-const serveLiveDirectoryPublicInstance = new ServeLiveDirectory({ path: paths.public }, {
+const serveLiveDirectoryPublicInstance = new ServeLiveDirectory(paths.public, {
   setHeaders: setHeadersForStaticAssets
 })
 safe.use(serveLiveDirectoryPublicInstance.middleware)
 // Static assets in /dist directory
-const serveLiveDirectoryDistInstance = new ServeLiveDirectory({ path: paths.dist }, {
+const serveLiveDirectoryDistInstance = new ServeLiveDirectory(paths.dist, {
   setHeaders: setHeadersForStaticAssets
 })
 safe.use(serveLiveDirectoryDistInstance.middleware)
@@ -231,9 +231,10 @@ safe.use('/api', api)
       }
     }
 
-    const serveLiveDirectoryCustomPagesInstance = new ServeLiveDirectory({
-      path: paths.customPages,
-      keep: ['.html']
+    const serveLiveDirectoryCustomPagesInstance = new ServeLiveDirectory(paths.customPages, {
+      instanceOptions: {
+        keep: ['.html']
+      }
     })
 
     // Cookie Policy
