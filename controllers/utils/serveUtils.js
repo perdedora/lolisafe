@@ -11,6 +11,14 @@ self.isFresh = (req, res) => {
   })
 }
 
+self.forwardSlashes = path => {
+  return path.split('\\').join('/')
+}
+
+self.relativePath = (root, path) => {
+  return self.forwardSlashes(path).replace(root, '')
+}
+
 /*
  * Based on https://github.com/pillarjs/send/blob/0.18.0/index.js
  * Copyright(c) 2012 TJ Holowaychuk

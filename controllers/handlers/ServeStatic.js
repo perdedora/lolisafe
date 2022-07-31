@@ -1,8 +1,26 @@
+/*
+ * ServeStatic is intended to be used last in middlewares/handlers hierarcy,
+ * as it has to check the physical disks everytime to lookup for files.
+ *
+ * Hence for lolisafe, this is meant to be used solely to serve uploaded files,
+ * if serving files with node.
+ * Because of that, it optionally comes with Content-Type overrides,
+ * and database query for Content-Disposition.
+ *
+ * This class also has Conditional GETs support,
+ * which involves handling cache-related headers such as
+ * If-Match, If-Unmodified-Since, ETag, etc.
+ * And partial bytes fetch by handling Content-Range header,
+ * which is useful for streaming, among other things.
+ *
+ * For other generic assets where lookups speed is a priority,
+ * please use ServeStaticQuick middleware.
+ */
+
 const contentDisposition = require('content-disposition')
 const etag = require('etag')
 const fs = require('fs')
 const parseRange = require('range-parser')
-const path = require('path')
 const SimpleDataStore = require('./../utils/SimpleDataStore')
 const errors = require('./../errorsController')
 const paths = require('./../pathsController')
@@ -24,7 +42,12 @@ class ServeStatic {
       throw new TypeError('Root directory must be set')
     }
 
-    this.directory = directory
+    this.directory = serveUtils.forwardSlashes(directory)
+
+    // Ensure does not end with a forward slash
+    if (this.directory.endsWith('/')) {
+      this.directory = this.directory.slice(0, -1)
+    }
 
     if (options.acceptRanges === undefined) {
       options.acceptRanges = true
@@ -141,8 +164,7 @@ class ServeStatic {
       return errors.handleNotFound(req, res)
     }
 
-    const fullPath = path.join(this.directory, req.path)
-
+    const fullPath = this.directory + req.path
     const stat = await this.#get(fullPath)
       .catch(error => {
         // Only re-throw errors if not due to missing files
