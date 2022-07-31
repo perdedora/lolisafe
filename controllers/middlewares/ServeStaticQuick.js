@@ -90,20 +90,23 @@ class ServeStaticQuick {
     }
 
     // ReadStream options with Content-Range support if required
-    const { options, length } = serveUtils.buildReadStreamOptions(req, res, stat, this.#options.acceptRanges)
+    const result = serveUtils.buildReadStreamOptions(req, res, stat, this.#options.acceptRanges)
+    if (!result) {
+      return res.end()
+    }
 
     // HEAD support
     if (req.method === 'HEAD') {
       // If HEAD, also set Content-Length (must be string)
-      res.header('Content-Length', String(length))
+      res.header('Content-Length', String(result.length))
       return res.end()
     }
 
-    if (length === 0) {
+    if (result.length === 0) {
       res.end()
     }
 
-    return this.#stream(req, res, stat, options, length)
+    return this.#stream(req, res, stat, result)
   }
 
   // Returns a promise which resolves to true once ServeStaticQuick is ready
@@ -195,9 +198,9 @@ class ServeStaticQuick {
     }
   }
 
-  #stream (req, res, stat, options, length) {
+  #stream (req, res, stat, result) {
     const fullPath = this.directory + req.path
-    const readStream = fs.createReadStream(fullPath, options)
+    const readStream = fs.createReadStream(fullPath, result.options)
 
     readStream.on('error', error => {
       readStream.destroy()
@@ -205,7 +208,7 @@ class ServeStaticQuick {
     })
 
     // 2nd param will be set as Content-Length header (must be number)
-    return res.stream(readStream, length)
+    return res.stream(readStream, result.length)
   }
 
   get middleware () {

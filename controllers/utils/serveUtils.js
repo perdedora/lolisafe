@@ -166,7 +166,8 @@ self.buildReadStreamOptions = (req, res, stat, acceptRanges) => {
       res.header('Content-Range', self.contentRange('bytes', length))
 
       // 416 Requested Range Not Satisfiable
-      return res.status(416).end()
+      res.status(416)
+      return false
     }
 
     // Valid (syntactically invalid/multiple ranges are treated as a regular response)

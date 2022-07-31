@@ -180,26 +180,29 @@ class ServeStatic {
     }
 
     // ReadStream options with Content-Range support if required
-    const { options, length } = serveUtils.buildReadStreamOptions(req, res, stat, this.#options.acceptRanges)
+    const result = serveUtils.buildReadStreamOptions(req, res, stat, this.#options.acceptRanges)
+    if (!result) {
+      return res.end()
+    }
 
     // HEAD support
     if (req.method === 'HEAD') {
       // If HEAD, also set Content-Length (must be string)
-      res.header('Content-Length', String(length))
+      res.header('Content-Length', String(result.length))
       return res.end()
     }
 
     // Only set Content-Disposition on initial GET request
     // Skip for subsequent requests on non-zero start byte (e.g. streaming)
-    if (options.start === 0 && this.setContentDisposition) {
+    if (result.options.start === 0 && this.setContentDisposition) {
       await this.setContentDisposition(req, res)
     }
 
-    if (length === 0) {
+    if (result.length === 0) {
       res.end()
     }
 
-    return this.#stream(req, res, fullPath, options, length)
+    return this.#stream(req, res, fullPath, result)
   }
 
   async #setHeaders (req, res, stat) {
@@ -229,8 +232,8 @@ class ServeStatic {
     }
   }
 
-  async #stream (req, res, fullPath, options, length) {
-    const readStream = fs.createReadStream(fullPath, options)
+  async #stream (req, res, fullPath, result) {
+    const readStream = fs.createReadStream(fullPath, result.options)
 
     readStream.on('error', error => {
       readStream.destroy()
@@ -238,7 +241,7 @@ class ServeStatic {
     })
 
     // 2nd param will be set as Content-Length header (must be number)
-    return res.stream(readStream, length)
+    return res.stream(readStream, result.length)
   }
 
   get handler () {
