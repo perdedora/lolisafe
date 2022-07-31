@@ -192,16 +192,16 @@ if (config.cacheControl) {
 }
 
 // Init ServeStaticQuick middlewares for static assets
-// Static assets in /public directory
-const serveStaticQuickPublicInstance = new ServeStaticQuick(paths.public, {
-  setHeaders: setHeadersForStaticAssets
-})
-safe.use(serveStaticQuickPublicInstance.middleware)
 // Static assets in /dist directory
 const serveStaticQuickDistInstance = new ServeStaticQuick(paths.dist, {
   setHeaders: setHeadersForStaticAssets
 })
 safe.use(serveStaticQuickDistInstance.middleware)
+// Static assets in /public directory
+const serveStaticQuickPublicInstance = new ServeStaticQuick(paths.public, {
+  setHeaders: setHeadersForStaticAssets
+})
+safe.use(serveStaticQuickPublicInstance.middleware)
 
 // Routes
 safe.use(album)
