@@ -121,22 +121,22 @@ self.list = async (req, res) => {
   // Base result object
   const result = { success: true, albums: [], albumsPerPage, count: 0, homeDomain }
 
+  // If simple listing (for dashboard sidebar)
+  if (simple) {
+    result.albums = await utils.db.table('albums')
+      .where(filter)
+      .select('id', 'name')
+    result.count = result.albums.length
+
+    return res.json(result)
+  }
+
   // Query albums count for pagination
   result.count = await utils.db.table('albums')
     .where(filter)
     .count('id as count')
     .then(rows => rows[0].count)
   if (!result.count) {
-    return res.json(result)
-  }
-
-  const fields = ['id', 'name']
-
-  if (simple) {
-    result.albums = await utils.db.table('albums')
-      .where(filter)
-      .select(fields)
-
     return res.json(result)
   }
 
@@ -147,7 +147,7 @@ self.list = async (req, res) => {
     offset = Math.max(0, Math.ceil(result.count / albumsPerPage) + offset)
   }
 
-  fields.push('identifier', 'enabled', 'timestamp', 'editedAt', 'zipGeneratedAt', 'download', 'public', 'description')
+  const fields = ['id', 'name', 'identifier', 'enabled', 'timestamp', 'editedAt', 'zipGeneratedAt', 'download', 'public', 'description']
   if (all) {
     fields.push('userid')
   }
