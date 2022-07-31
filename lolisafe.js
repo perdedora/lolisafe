@@ -128,8 +128,10 @@ safe.use(nunjucksRendererInstance.middleware)
 // and additionally call Cloudflare API to have their CDN caches purged when lolisafe starts
 const cdnRoutes = [...config.pages]
 
-// Defaults to no-op
-let setHeadersForStaticAssets = () => {}
+// Defaults to validating cache's validity before using them (soft cache)
+let setHeadersForStaticAssets = (req, res) => {
+  res.header('Cache-Control', 'no-cache')
+}
 
 // Cache control
 if (config.cacheControl) {
