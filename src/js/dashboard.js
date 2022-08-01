@@ -529,7 +529,7 @@ page.getUploads = (params = {}) => {
   if (params.filters) {
     headers.filters = params.filters
     // Send client timezone offset if properly using date: and/or :expiry filters
-    // Server will pretend client is on UTC if unset
+    // Server will assume client is on UTC if unset
     if (/(^|\s)(date|expiry):[\d"]/.test(params.filters)) {
       headers.minoffset = new Date().getTimezoneOffset()
     }
@@ -734,7 +734,7 @@ page.getUploads = (params = {}) => {
           : ''
       } else if (typeof params.album === 'undefined') {
         files[i].appendix = files[i].albumid
-          ? albums[files[i].albumid] || ''
+          ? `[${files[i].albumid}] ${albums[files[i].albumid]}` || ''
           : ''
       }
     }
@@ -851,7 +851,7 @@ page.getUploads = (params = {}) => {
           <th class="name"><a href="${upload.file}" target="_blank" title="${upload.file}">${upload.name}</a></th>
           ${showOriginalNames ? `<th class="originalname" title="${upload.original}">${upload.original}</th>` : ''}
           ${typeof params.album === 'undefined' ? `<th class="appendix">${upload.appendix}</th>` : ''}
-          ${allAlbums ? `<th class="album">${upload.albumid ? (albums[upload.albumid] || '') : ''}</th>` : ''}
+          ${allAlbums ? `<th class="album">${upload.albumid ? (`[${upload.albumid}] ${albums[upload.albumid]}` || '') : ''}</th>` : ''}
           <td class="prettybytes" data-bytes="${upload.size}">${upload.prettyBytes}</td>
           ${params.all ? `<td class="ip">${upload.ip || ''}</td>` : ''}
           <td class="prettydate" data-timestamp="${upload.timestamp}">${upload.prettyDate}</td>
