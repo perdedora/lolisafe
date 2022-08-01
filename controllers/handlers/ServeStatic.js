@@ -31,8 +31,6 @@ class ServeStatic {
   directory
   contentDispositionStore
   contentTypesMaps
-  setContentDisposition
-  setContentType
 
   #options
 
@@ -70,7 +68,7 @@ class ServeStatic {
       throw new TypeError('Middleware option setHeaders must be a function')
     }
 
-    // Init Content-Type overrides
+    // Init Content-Type overrides map if required
     if (typeof options.overrideContentTypes === 'object') {
       this.contentTypesMaps = new Map()
 
@@ -85,23 +83,13 @@ class ServeStatic {
       }
 
       if (this.contentTypesMaps.size) {
-        this.setContentType = (req, res) => {
-          // Do only if accessing files from uploads' root directory (i.e. not thumbs, etc.)
-          if (req.path.indexOf('/', 1) === -1) {
-            const name = req.path.substring(1)
-            const extname = utils.extname(name).substring(1)
-            const contentType = this.contentTypesMaps.get(extname)
-            if (contentType) {
-              res.header('Content-Type', contentType)
-            }
-          }
-        }
+        logger.debug(`Inititated Content-Type overrides map for ${this.contentTypesMaps.size} extension(s).`)
       } else {
         this.contentTypesMaps = undefined
       }
     }
 
-    // Init Content-Disposition store and setHeaders function if required
+    // Init Content-Disposition store if required
     if (options.setContentDisposition) {
       this.contentDispositionStore = new SimpleDataStore(
         options.contentDispositionOptions || {
@@ -109,32 +97,6 @@ class ServeStatic {
           strategy: SimpleDataStore.STRATEGIES[0]
         }
       )
-
-      this.setContentDisposition = async (req, res) => {
-        // Do only if accessing files from uploads' root directory (i.e. not thumbs, etc.)
-        if (req.path.indexOf('/', 1) !== -1) return
-        const name = req.path.substring(1)
-        try {
-          let original = this.contentDispositionStore.get(name)
-          if (original === undefined) {
-            this.contentDispositionStore.hold(name)
-            original = await utils.db.table('files')
-              .where('name', name)
-              .select('original')
-              .first()
-              .then(_file => {
-                this.contentDispositionStore.set(name, _file.original)
-                return _file.original
-              })
-          }
-          if (original) {
-            res.header('Content-Disposition', contentDisposition(original, { type: 'inline' }))
-          }
-        } catch (error) {
-          this.contentDispositionStore.delete(name)
-          logger.error(error)
-        }
-      }
 
       logger.debug('Inititated SimpleDataStore for Content-Disposition: ' +
          `{ limit: ${this.contentDispositionStore.limit}, strategy: "${this.contentDispositionStore.strategy}" }`)
@@ -194,8 +156,8 @@ class ServeStatic {
 
     // Only set Content-Disposition on initial GET request
     // Skip for subsequent requests on non-zero start byte (e.g. streaming)
-    if (result.options.start === 0 && this.setContentDisposition) {
-      await this.setContentDisposition(req, res)
+    if (result.options.start === 0 && this.contentDispositionStore) {
+      await this.#setContentDisposition(req, res)
     }
 
     if (result.length === 0) {
@@ -205,10 +167,52 @@ class ServeStatic {
     return this.#stream(req, res, fullPath, result)
   }
 
+  async #setContentDisposition (req, res) {
+    // Do only if accessing files from uploads' root directory (i.e. not thumbs, etc.)
+    if (req.path.indexOf('/', 1) !== -1) return
+
+    // Encapsulate within try-catch block because we do not want these to throw
+    const name = req.path.substring(1)
+    try {
+      let original = this.contentDispositionStore.get(name)
+      if (original === undefined) {
+        this.contentDispositionStore.hold(name)
+        original = await utils.db.table('files')
+          .where('name', name)
+          .select('original')
+          .first()
+          .then(_file => {
+            this.contentDispositionStore.set(name, _file.original)
+            return _file.original
+          })
+      }
+      if (original) {
+        res.header('Content-Disposition', contentDisposition(original, { type: 'inline' }))
+      }
+    } catch (error) {
+      this.contentDispositionStore.delete(name)
+      logger.error(error)
+    }
+  }
+
+  async #setContentType (req, res) {
+    // Do only if accessing files from uploads' root directory (i.e. not thumbs, etc.)
+    if (req.path.indexOf('/', 1) !== -1) return
+
+    const name = req.path.substring(1)
+    const extname = utils.extname(name).substring(1)
+    const contentType = this.contentTypesMaps.get(extname)
+    if (contentType) {
+      // NOTE: Use lowercase key because the header initially set
+      // with Response.type() is also lowercase
+      res.header('content-type', contentType)
+    }
+  }
+
   async #setHeaders (req, res, stat) {
     // Override Content-Type if required
-    if (this.setContentType) {
-      this.setContentType(req, res)
+    if (this.contentTypesMaps) {
+      this.#setContentType(req, res)
     }
 
     // Always do external setHeaders function first,
