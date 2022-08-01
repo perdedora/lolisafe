@@ -1216,7 +1216,7 @@ self.list = async (req, res) => {
   const albumid = req.path_parameters && Number(req.path_parameters.albumid)
   const basedomain = utils.conf.domain
 
-  // Thresholds for regular users
+  // Thresholds for regular users (usergroups lower than moderator)
   const MAX_WILDCARDS_IN_KEY = 2
   const MAX_TEXT_QUERIES = 3 // non-keyed keywords
   const MAX_SORT_KEYS = 1
@@ -1250,6 +1250,7 @@ self.list = async (req, res) => {
     // Columns with which to use SQLite's NULLS LAST option
     nullsLast: [
       'userid',
+      'albumid',
       'expirydate',
       'ip'
     ],
@@ -1624,7 +1625,10 @@ self.list = async (req, res) => {
 
     // Then, refine using the supplied 'date' ranges
     this.andWhere(function () {
-      if (!filterObj.queries.date || (!filterObj.queries.date.from && !filterObj.queries.date.to)) return
+      if (!filterObj.queries.date ||
+        (!filterObj.queries.date.from && !filterObj.queries.date.to)) {
+        return
+      }
       if (typeof filterObj.queries.date.from === 'number') {
         if (typeof filterObj.queries.date.to === 'number') {
           this.andWhereBetween('timestamp', [filterObj.queries.date.from, filterObj.queries.date.to])
@@ -1638,7 +1642,10 @@ self.list = async (req, res) => {
 
     // Then, refine using the supplied 'expiry' ranges
     this.andWhere(function () {
-      if (!filterObj.queries.expiry || (!filterObj.queries.expiry.from && !filterObj.queries.expiry.to)) return
+      if (!filterObj.queries.expiry ||
+        (!filterObj.queries.expiry.from && !filterObj.queries.expiry.to)) {
+        return
+      }
       if (typeof filterObj.queries.expiry.from === 'number') {
         if (typeof filterObj.queries.expiry.to === 'number') {
           this.andWhereBetween('expirydate', [filterObj.queries.expiry.from, filterObj.queries.expiry.to])
@@ -1710,14 +1717,20 @@ self.list = async (req, res) => {
   }
 
   const columns = ['id', 'name', 'original', 'userid', 'size', 'timestamp']
-  if (utils.retentions.enabled) columns.push('expirydate')
+  if (utils.retentions.enabled) {
+    columns.push('expirydate')
+  }
   if (!all ||
-      filterObj.queries.albumid ||
-      filterObj.queries.exclude.albumid ||
-      filterObj.flags.albumidNull !== undefined) columns.push('albumid')
+    filterObj.queries.albumid ||
+    filterObj.queries.exclude.albumid ||
+    filterObj.flags.albumidNull !== undefined) {
+    columns.push('albumid')
+  }
 
   // Only select IPs if we are listing all uploads
-  if (all) columns.push('ip')
+  if (all) {
+    columns.push('ip')
+  }
 
   // Build raw query for order by (sorting) operation
   let orderByRaw
