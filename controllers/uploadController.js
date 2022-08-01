@@ -1219,7 +1219,7 @@ self.list = async (req, res) => {
   // Thresholds for regular users (usergroups lower than moderator)
   const MAX_WILDCARDS_IN_KEY = 2
   const MAX_TEXT_QUERIES = 3 // non-keyed keywords
-  const MAX_SORT_KEYS = 1
+  const MAX_SORT_KEYS = 2
   const MAX_IS_KEYS = 1
 
   const filterObj = {
