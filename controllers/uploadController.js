@@ -360,8 +360,10 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
       }
 
       if (file.isChunk) {
+        // Re-map UUID property to IP-specific UUID
+        const uuid = `${req.ip}_${req.body.uuid}`
         // Calling initChunks() will also reset the chunked uploads' timeout
-        file.chunksData = await initChunks(req.body.uuid)
+        file.chunksData = await initChunks(uuid)
         file.filename = file.chunksData.filename
         file.path = file.chunksData.path
       } else {
@@ -441,7 +443,7 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
     // Clean up temp files and held identifiers (do not wait)
     cleanUpFiles()
 
-    // res.multipart() itself may throw string errors
+    // Response.multipart() itself may throw string errors
     if (typeof error === 'string') {
       throw new ClientError(error)
     } else {
@@ -454,13 +456,15 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
   }
 
   // If chunked uploads is enabled and the uploaded file is a chunk, then just say that it was a success
-  const uuid = req.body.uuid
-  if (chunkedUploads && chunksData[uuid] !== undefined) {
+  // NOTE: We loop through Request.files for clarity,
+  // but we will actually have already rejected the Request
+  // if it has more than 1 file while being a chunk upload
+  if (chunkedUploads && req.files.some(file => file.isChunk)) {
     req.files.forEach(file => {
-      chunksData[uuid].chunks++
+      file.chunksData.chunks++
+      // Mark as ready to accept more chunk uploads or to finalize
+      file.chunksData.processing = false
     })
-    // Mark as ready to accept more chunk uploads or to finalize
-    chunksData[uuid].processing = false
     return res.json({ success: true })
   }
 
@@ -700,6 +704,11 @@ self.finishChunks = async (req, res) => {
   if (!Array.isArray(files) || !files.length) {
     throw new ClientError('Bad request.')
   }
+
+  // Re-map UUID property to IP-specific UUID
+  files.forEach(file => {
+    file.uuid = `${req.ip}_${file.uuid}`
+  })
 
   return self.actuallyFinishChunks(req, res, user, files)
     .catch(error => {
