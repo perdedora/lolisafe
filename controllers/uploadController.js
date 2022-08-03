@@ -459,7 +459,7 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
   // NOTE: We loop through Request.files for clarity,
   // but we will actually have already rejected the Request
   // if it has more than 1 file while being a chunk upload
-  if (chunkedUploads && req.files.some(file => file.isChunk)) {
+  if (req.files.some(file => file.isChunk)) {
     req.files.forEach(file => {
       file.chunksData.chunks++
       // Mark as ready to accept more chunk uploads or to finalize
