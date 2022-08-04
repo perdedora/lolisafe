@@ -12,10 +12,11 @@ routes.get('/nojs', async (req, res) => {
   })
 })
 
-// HyperExpress defaults to 250kb
-// https://github.com/kartikk221/hyper-express/blob/6.4.4/docs/Server.md#server-constructor-options
-const maxBodyLength = parseInt(config.uploads.maxSize) * 1e6
-routes.post('/nojs', { max_body_length: maxBodyLength }, async (req, res) => {
+routes.post('/nojs', {
+  // HyperExpress defaults to 250kb
+  // https://github.com/kartikk221/hyper-express/blob/6.4.4/docs/Server.md#server-constructor-options
+  max_body_length: parseInt(config.uploads.maxSize) * 1e6
+}, async (req, res) => {
   res._json = res.json
   res.json = (...args) => {
     const result = args[0]

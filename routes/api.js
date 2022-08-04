@@ -43,11 +43,14 @@ routes.post('/users/edit', [auth.requireUser, utils.assertJSON], auth.editUser)
 
 /** ./controllers/uploadController.js */
 
-// HyperExpress defaults to 250kb
-// https://github.com/kartikk221/hyper-express/blob/6.4.4/docs/Server.md#server-constructor-options
-const maxBodyLength = parseInt(config.uploads.maxSize) * 1e6
-routes.post('/upload', { max_body_length: maxBodyLength }, auth.optionalUser, upload.upload)
-routes.post('/upload/:albumid', { max_body_length: maxBodyLength }, auth.optionalUser, upload.upload)
+const uploadRouteOptions = {
+  // HyperExpress defaults to 250kb
+  // https://github.com/kartikk221/hyper-express/blob/6.4.5/docs/Server.md#server-constructor-options
+  max_body_length: parseInt(config.uploads.maxSize) * 1e6,
+  middlewares: [auth.optionalUser]
+}
+routes.post('/upload', uploadRouteOptions, upload.upload)
+routes.post('/upload/:albumid', uploadRouteOptions, upload.upload)
 routes.post('/upload/finishchunks', [auth.optionalUser, utils.assertJSON], upload.finishChunks)
 
 routes.get('/uploads', auth.requireUser, upload.list)
