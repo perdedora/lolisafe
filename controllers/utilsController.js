@@ -392,6 +392,13 @@ self.filterUniquifySqlArray = (value, index, array) => {
     array.indexOf(value) === index
 }
 
+self.unlistenEmitters = (emitters, eventName, listener) => {
+  emitters.forEach(emitter => {
+    if (!emitter) return
+    emitter.off(eventName, listener)
+  })
+}
+
 self.assertRequestType = (req, type) => {
   if (!req.is(type)) {
     throw new ClientError(`Request Content-Type must be ${type}.`)

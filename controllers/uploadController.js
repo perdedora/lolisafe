@@ -379,10 +379,20 @@ self.actuallyUpload = async (req, res, data = {}) => {
       const readStream = field.file.stream
       let writeStream
       let hashStream
+      let _reject
 
       // Write the file into disk, and supply required props into file object
-      file.promised = await new Promise((resolve, reject) => {
-        readStream.once('error', reject)
+      await new Promise((resolve, reject) => {
+        // Keep reference to Promise's reject function to allow unlistening events
+        _reject = reject
+
+        // Ensure this Promise's status can be asserted later
+        const _resolve = () => {
+          file.promised = true
+          return resolve()
+        }
+
+        readStream.once('error', _reject)
 
         if (file.isChunk) {
           writeStream = file.chunksData.writeStream
@@ -393,10 +403,10 @@ self.actuallyUpload = async (req, res, data = {}) => {
         }
 
         // Re-init stream errors listeners for this Request
-        writeStream.once('error', reject)
+        writeStream.once('error', _reject)
 
         if (hashStream) {
-          hashStream.once('error', reject)
+          hashStream.once('error', _reject)
           readStream.on('data', data => {
             // .dispose() will destroy this internal component,
             // so use it as an indicator of whether the hashStream has been .dispose()'d
@@ -408,7 +418,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
 
         if (file.isChunk) {
           // We listen for readStream's end event
-          readStream.once('end', () => resolve(true))
+          readStream.once('end', () => _resolve())
         } else {
           // We immediately listen for writeStream's finish event
           writeStream.once('finish', () => {
@@ -419,7 +429,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
                 ? ''
                 : hash
             }
-            resolve(true)
+            return _resolve()
           })
         }
 
@@ -438,6 +448,10 @@ self.actuallyUpload = async (req, res, data = {}) => {
 
         // Re-throw error
         throw error
+      }).finally(() => {
+        if (!file.isChunk) return
+        // Unlisten streams' error event for this Request if it's a chunk upload
+        utils.unlistenEmitters([writeStream, hashStream], 'error', _reject)
       })
 
       // file.size is not populated if a chunk upload, so ignore
