@@ -287,6 +287,13 @@ self.actuallyUpload = async (req, res, data = {}) => {
   req.body = {}
   req.files = []
 
+  const unfreezeChunksData = async () => {
+    req.files.forEach(file => {
+      if (!file.chunksData) return
+      file.chunksData.processing = false
+    })
+  }
+
   const cleanUpFiles = async () => {
     // Unhold identifiers generated via self.getUniqueUploadIdentifier()
     self.unholdUploadIdentifiers(res)
@@ -374,7 +381,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
       let hashStream
 
       // Write the file into disk, and supply required props into file object
-      await new Promise((resolve, reject) => {
+      file.promised = await new Promise((resolve, reject) => {
         readStream.once('error', reject)
 
         if (file.isChunk) {
@@ -401,15 +408,18 @@ self.actuallyUpload = async (req, res, data = {}) => {
 
         if (file.isChunk) {
           // We listen for readStream's end event
-          readStream.once('end', resolve)
+          readStream.once('end', () => resolve(true))
         } else {
           // We immediately listen for writeStream's finish event
           writeStream.once('finish', () => {
             file.size = writeStream.bytesWritten
             if (hashStream && hashStream.hash.hash) {
-              file.hash = hashStream.digest('hex')
+              const hash = hashStream.digest('hex')
+              file.hash = file.size === 0
+                ? ''
+                : hash
             }
-            resolve()
+            resolve(true)
           })
         }
 
@@ -438,6 +448,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
   }).catch(error => {
     // Clean up temp files and held identifiers (do not wait)
     cleanUpFiles()
+    unfreezeChunksData()
 
     // Response.multipart() itself may throw string errors
     if (typeof error === 'string') {
@@ -451,11 +462,22 @@ self.actuallyUpload = async (req, res, data = {}) => {
     throw new ClientError('No files.')
   }
 
+  // If for some reason Request.multipart() resolves before a file's Promise
+  // Typically caused by something hanging up longer than
+  // uWebSockets.js' internal security timeout (10 seconds)
+  if (req.files.some(file => file.promised !== true)) {
+    // Clean up temp files and held identifiers (do not wait)
+    cleanUpFiles()
+    unfreezeChunksData()
+
+    throw new ServerError()
+  }
+
   // If chunked uploads is enabled and the uploaded file is a chunk, then just say that it was a success
   // NOTE: We loop through Request.files for clarity,
   // but we will actually have already rejected the Request
   // if it has more than 1 file while being a chunk upload
-  if (req.files.some(file => file.isChunk)) {
+  if (req.files.some(file => file.chunksData)) {
     req.files.forEach(file => {
       file.chunksData.chunks++
       // Mark as ready to accept more chunk uploads or to finalize
