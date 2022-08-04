@@ -60,7 +60,20 @@ const page = {
   videoExts: ['.avi', '.m2ts', '.m4v', '.mkv', '.mov', '.mp4', '.webm', '.wmv'],
 
   albumTitleMaxLength: 70,
-  albumDescMaxLength: 4000
+  albumDescMaxLength: 4000,
+
+  // Better Cloudflare errors
+  cloudflareErrors: {
+    520: 'Unknown Error',
+    521: 'Web Server Is Down',
+    522: 'Connection Timed Out',
+    523: 'Origin Is Unreachable',
+    524: 'A Timeout Occurred',
+    525: 'SSL Handshake Failed',
+    526: 'Invalid SSL Certificate',
+    527: 'Railgun Error',
+    530: 'Origin DNS Error'
+  }
 }
 
 // Handler for errors during initialization
@@ -104,30 +117,19 @@ page.onError = error => {
 }
 
 // Handler for Axios errors
-page.onAxiosError = (error, cont) => {
-  if (!cont) console.error(error)
+page.onAxiosError = error => {
+  const statusText = page.cloudflareErrors[error.response.status] || error.response.statusText
+  const description = error.response.data && error.response.data.description
+    ? error.response.data.description
+    : 'There was an error with the request.\nPlease check the console for more information.'
 
-  // Better Cloudflare errors
-  const cloudflareErrors = {
-    520: 'Unknown Error',
-    521: 'Web Server Is Down',
-    522: 'Connection Timed Out',
-    523: 'Origin Is Unreachable',
-    524: 'A Timeout Occurred',
-    525: 'SSL Handshake Failed',
-    526: 'Invalid SSL Certificate',
-    527: 'Railgun Error',
-    530: 'Origin DNS Error'
-  }
+  return swal(`${error.response.status} ${statusText}`, description, 'error')
+}
 
-  const statusText = cloudflareErrors[error.response.status] || error.response.statusText
+page.formatAxiosError = error => {
+  const statusText = page.cloudflareErrors[error.response.status] || error.response.statusText
 
-  if (!cont) {
-    const description = error.response.data && error.response.data.description
-      ? error.response.data.description
-      : 'There was an error with the request.\nPlease check the console for more information.'
-    return swal(`${error.response.status} ${statusText}`, description, 'error')
-  } else if (error.response.data && error.response.data.description) {
+  if (error.response.data && error.response.data.description) {
     return error.response
   } else {
     const description = error.response
@@ -223,11 +225,7 @@ page.verifyToken = token => {
 
     return page.prepareUpload()
   }).catch(error => {
-    return swal({
-      title: 'An error occurred!',
-      text: error.response.data ? error.response.data.description : error.toString(),
-      icon: 'error'
-    }).then(() => {
+    return page.onAxiosError(error).then(() => {
       if (error.response.data && error.response.data.code === 10001) {
         localStorage.removeItem(lsKeys.token)
         window.location.reload()
@@ -526,13 +524,13 @@ page.prepareDropzone = () => {
         if (typeof error === 'object' && error.description) {
           err = error.description
         } else if (xhr) {
-          // Formatting the Object is necessary since the function expect Axios errors
-          err = page.onAxiosError({
+          const formatted = page.formatAxiosError({
             response: {
               status: xhr.status,
               statusText: xhr.statusText
             }
-          }, true).data.description
+          })
+          err = formatted.data.description
         } else if (error instanceof Error) {
           err = error.toString()
         }
@@ -573,7 +571,7 @@ page.prepareDropzone = () => {
           // strip tags cannot yet be configured per file with this API
           striptags: page.stripTags
         }
-      }).catch(error => page.onAxiosError(error, true)).then(response => {
+      }).catch(error => page.formatAxiosError(error)).then(response => {
         file.previewElement.querySelector('.descriptive-progress').classList.add('is-hidden')
 
         if (response.data.success === false) {
@@ -667,7 +665,7 @@ page.processUrlsQueue = () => {
         age: page.uploadAge,
         filelength: page.fileLength
       }
-    }).catch(error => page.onAxiosError(error, true)).then(response => {
+    }).catch(error => page.formatAxiosError(error)).then(response => {
       return finishedUrlUpload(file, response.data)
     })
   }

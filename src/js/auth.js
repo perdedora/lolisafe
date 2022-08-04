@@ -10,7 +10,20 @@ const page = {
 
   // HTML elements
   user: null,
-  pass: null
+  pass: null,
+
+  // Better Cloudflare errors
+  cloudflareErrors: {
+    520: 'Unknown Error',
+    521: 'Web Server Is Down',
+    522: 'Connection Timed Out',
+    523: 'Origin Is Unreachable',
+    524: 'A Timeout Occurred',
+    525: 'SSL Handshake Failed',
+    526: 'Invalid SSL Certificate',
+    527: 'Railgun Error',
+    530: 'Origin DNS Error'
+  }
 }
 
 page.unhide = () => {
@@ -26,22 +39,7 @@ page.unhide = () => {
 
 // Handler for Axios errors
 page.onAxiosError = error => {
-  console.error(error)
-
-  // Better Cloudflare errors
-  const cloudflareErrors = {
-    520: 'Unknown Error',
-    521: 'Web Server Is Down',
-    522: 'Connection Timed Out',
-    523: 'Origin Is Unreachable',
-    524: 'A Timeout Occurred',
-    525: 'SSL Handshake Failed',
-    526: 'Invalid SSL Certificate',
-    527: 'Railgun Error',
-    530: 'Origin DNS Error'
-  }
-
-  const statusText = cloudflareErrors[error.response.status] || error.response.statusText
+  const statusText = page.cloudflareErrors[error.response.status] || error.response.statusText
   const description = error.response.data && error.response.data.description
     ? error.response.data.description
     : 'There was an error with the request.\nPlease check the console for more information.'
