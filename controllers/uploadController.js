@@ -217,8 +217,11 @@ self.unholdUploadIdentifiers = res => {
 }
 
 self.assertRetentionPeriod = (user, age) => {
-  if (!utils.retentions.enabled) return null
+  if (!utils.retentions.enabled) {
+    return null
+  }
 
+  // _ is special key for non-registered users (no auth requests)
   const group = user ? perms.group(user) : '_'
   if (!group || !utils.retentions.periods[group]) {
     throw new ClientError('You are not eligible for any file retention periods.', { statusCode: 403 })

@@ -602,7 +602,9 @@ self.unlinkFile = async (filename, predb) => {
 
 self.bulkDeleteFromDb = async (field, values, user) => {
   // Always return an empty array on failure
-  if (!user || !['id', 'name'].includes(field) || !values.length) return []
+  if (!user || !['id', 'name'].includes(field) || !values.length) {
+    return []
+  }
 
   // SQLITE_LIMIT_VARIABLE_NUMBER, which defaults to 999
   // Read more: https://www.sqlite.org/limits.html
