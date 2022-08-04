@@ -2972,7 +2972,7 @@ https-proxy-agent@^5.0.0:
     agent-base "6"
     debug "4"
 
-hyper-express@~6.4.2:
+hyper-express@6.4.2:
   version "6.4.2"
   resolved "https://registry.yarnpkg.com/hyper-express/-/hyper-express-6.4.2.tgz#f3828cda1bf64c67287907d29bd6ea7270f2e4eb"
   integrity sha512-R4cvUrdDYpulzer6GShRVZQs6V69HRwkV28Y+e3YnSMh2nYf0ipvCmCbOOKbcecUs64cNbY49hujht/njYAgLw==
