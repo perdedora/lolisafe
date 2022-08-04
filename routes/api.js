@@ -77,9 +77,9 @@ routes.post('/albums/rename', [auth.requireUser, utils.assertJSON], albums.renam
 /** ./controllers/tokenController.js **/
 
 routes.get('/tokens', auth.requireUser, tokens.list)
-routes.post('/tokens/change', async (req, res) => {
+routes.post('/tokens/change', (req, res, next) => {
   // Include user's "token" field into database query
-  return auth.requireUser(req, res, null, 'token')
+  auth.requireUser(req, res, next, 'token')
 }, tokens.change)
 routes.post('/tokens/verify', utils.assertJSON, tokens.verify)
 

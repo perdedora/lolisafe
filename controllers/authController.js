@@ -35,7 +35,16 @@ const usersPerPage = config.dashboard
   ? Math.max(Math.min(config.dashboard.usersPerPage || 0, 100), 1)
   : 25
 
-self.assertUser = async (token, fields) => {
+// ip is an optional parameter, which if set will be rate limited
+// using tokens.invalidTokenRateLimiter pool
+self.assertUser = async (token, fields, ip) => {
+  if (ip) {
+    const rateLimiterRes = await tokens.invalidTokenRateLimiter.get(ip)
+    if (rateLimiterRes && rateLimiterRes.remainingPoints <= 0) {
+      throw new ClientError('Too many requests with invalid token. Try again in a while.', { statusCode: 429 })
+    }
+  }
+
   // Default fields/columns to fetch from database
   const _fields = ['id', 'username', 'enabled', 'timestamp', 'permission', 'registration']
 
@@ -57,32 +66,44 @@ self.assertUser = async (token, fields) => {
     }
     return user
   } else {
-    throw new ClientError('Invalid token.', { statusCode: 403 })
+    if (ip) {
+      // Rate limit attempts with invalid token
+      await tokens.invalidTokenRateLimiter.consume(ip, 1)
+    }
+    throw new ClientError('Invalid token.', { statusCode: 403, code: 10001 })
   }
 }
 
-// _ is next() if this was a synchronous middleware function
-self.requireUser = async (req, res, _, fields) => {
+self.requireUser = (req, res, next, fields) => {
   // Throws when token is missing, thus use only for users-only routes
   const token = req.headers.token
   if (token === undefined) {
-    throw new ClientError('No token provided.', { statusCode: 403 })
+    return next(new ClientError('No token provided.', { statusCode: 403 }))
   }
 
-  // Add user data to Request.locals.user
-  req.locals.user = await self.assertUser(token, fields)
+  self.assertUser(token, fields, req.ip)
+    .then(user => {
+      // Add user data to Request.locals.user
+      req.locals.user = user
+      return next()
+    })
+    .catch(next)
 }
 
-// _ is next() if this was a synchronous middleware function
-self.optionalUser = async (req, res, _, fields) => {
+self.optionalUser = (req, res, next, fields) => {
   // Throws when token if missing only when private is set to true in config,
   // thus use for routes that can handle no auth requests
   const token = req.headers.token
   if (token) {
-    // Add user data to Request.locals.user
-    req.locals.user = await self.assertUser(token, fields)
+    self.assertUser(token, fields, req.ip)
+      .then(user => {
+        // Add user data to Request.locals.user
+        req.locals.user = user
+        return next()
+      })
+      .catch(next)
   } else if (config.private === true) {
-    throw new ClientError('No token provided.', { statusCode: 403 })
+    return next(new ClientError('No token provided.', { statusCode: 403 }))
   }
 }
 

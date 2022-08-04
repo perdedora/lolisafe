@@ -1,4 +1,5 @@
 const randomstring = require('randomstring')
+const { RateLimiterMemory } = require('rate-limiter-flexible')
 const perms = require('./permissionController')
 const utils = require('./utilsController')
 const ClientError = require('./utils/ClientError')
@@ -9,7 +10,13 @@ const self = {
   tokenLength: 64,
   tokenMaxTries: 3,
 
-  onHold: new Set() // temporarily held random tokens
+  onHold: new Set(), // temporarily held random tokens
+
+  // Maximum of 6 token auth failures in 10 minutes
+  invalidTokenRateLimiter: new RateLimiterMemory({
+    points: 6,
+    duration: 10 * 60
+  })
 }
 
 self.getUniqueToken = async res => {
@@ -71,12 +78,19 @@ self.verify = async (req, res) => {
     throw new ClientError('No token provided.', { statusCode: 403 })
   }
 
+  const rateLimiterRes = await self.invalidTokenRateLimiter.get(req.ip)
+  if (rateLimiterRes && rateLimiterRes.remainingPoints <= 0) {
+    throw new ClientError('Too many requests with invalid token. Try again in a while.', { statusCode: 429 })
+  }
+
   const user = await utils.db.table('users')
     .where('token', token)
     .select('username', 'permission')
     .first()
 
   if (!user) {
+    // Rate limit attempts with invalid token
+    await self.invalidTokenRateLimiter.consume(req.ip, 1)
     throw new ClientError('Invalid token.', { statusCode: 403, code: 10001 })
   }
 
