@@ -259,15 +259,8 @@ self.upload = async (req, res) => {
     throw new ClientError('Request Content-Type must be either multipart/form-data or application/json.')
   }
 
-  let user
-  if (config.private === true) {
-    user = await utils.authorize(req)
-  } else if (req.headers.token) {
-    user = await utils.assertUser(req.headers.token)
-  }
-
   if (config.privateUploadGroup) {
-    if (!user || !perms.is(user, config.privateUploadGroup)) {
+    if (!req.locals.user || !perms.is(req.locals.user, config.privateUploadGroup)) {
       throw new ClientError(config.privateUploadCustomResponse || 'Your usergroup is not permitted to upload new files.', { statusCode: 403 })
     }
   }
@@ -275,18 +268,18 @@ self.upload = async (req, res) => {
   let albumid = parseInt(req.headers.albumid || (req.path_parameters && req.path_parameters.albumid))
   if (isNaN(albumid)) albumid = null
 
-  const age = self.assertRetentionPeriod(user, req.headers.age)
+  const age = self.assertRetentionPeriod(req.locals.user, req.headers.age)
 
   if (isMultipart) {
-    return self.actuallyUpload(req, res, user, { albumid, age })
+    return self.actuallyUpload(req, res, { albumid, age })
   } else {
     // Parse POST body
     req.body = await req.json()
-    return self.actuallyUploadUrls(req, res, user, { albumid, age })
+    return self.actuallyUploadUrls(req, res, { albumid, age })
   }
 }
 
-self.actuallyUpload = async (req, res, user, data = {}) => {
+self.actuallyUpload = async (req, res, data = {}) => {
   // Init empty Request.body and Request.files
   req.body = {}
   req.files = []
@@ -471,7 +464,7 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
   const filesData = req.files
 
   if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, user, filesData)
+    const scanResult = await self.scanFiles(req, filesData)
     if (scanResult) {
       throw new ClientError(scanResult)
     }
@@ -479,13 +472,13 @@ self.actuallyUpload = async (req, res, user, data = {}) => {
 
   await self.stripTags(req, filesData)
 
-  const result = await self.storeFilesToDb(req, res, user, filesData)
-  return self.sendUploadResponse(req, res, user, result)
+  const result = await self.storeFilesToDb(req, res, filesData)
+  return self.sendUploadResponse(req, res, result)
 }
 
 /** URL uploads */
 
-self.actuallyUploadUrls = async (req, res, user, data = {}) => {
+self.actuallyUploadUrls = async (req, res, data = {}) => {
   if (!config.uploads.urlMaxSize) {
     throw new ClientError('Upload by URLs is disabled at the moment.', { statusCode: 403 })
   }
@@ -670,35 +663,22 @@ self.actuallyUploadUrls = async (req, res, user, data = {}) => {
   })
 
   if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, user, filesData)
+    const scanResult = await self.scanFiles(req, filesData)
     if (scanResult) {
       throw new ClientError(scanResult)
     }
   }
 
-  const result = await self.storeFilesToDb(req, res, user, filesData)
-  return self.sendUploadResponse(req, res, user, result)
+  const result = await self.storeFilesToDb(req, res, filesData)
+  return self.sendUploadResponse(req, res, result)
 }
 
 /** Chunk uploads */
 
 self.finishChunks = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-
   if (!chunkedUploads) {
     throw new ClientError('Chunked upload is disabled.', { statusCode: 403 })
   }
-
-  let user
-  if (config.private === true) {
-    user = await utils.authorize(req)
-    if (!user) return
-  } else if (req.headers.token) {
-    user = await utils.assertUser(req.headers.token)
-  }
-
-  // Parse POST body
-  req.body = await req.json()
 
   const files = req.body.files
   if (!Array.isArray(files) || !files.length) {
@@ -710,7 +690,7 @@ self.finishChunks = async (req, res) => {
     file.uuid = `${req.ip}_${file.uuid}`
   })
 
-  return self.actuallyFinishChunks(req, res, user, files)
+  return self.actuallyFinishChunks(req, res, files)
     .catch(error => {
       // Unlink temp files (do not wait)
       Promise.all(files.map(async file => {
@@ -723,7 +703,7 @@ self.finishChunks = async (req, res) => {
     })
 }
 
-self.actuallyFinishChunks = async (req, res, user, files) => {
+self.actuallyFinishChunks = async (req, res, files) => {
   const filesData = []
   await Promise.all(files.map(async file => {
     if (!file.uuid || typeof chunksData[file.uuid] === 'undefined') {
@@ -754,7 +734,7 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
       throw new ClientError(`${extname ? `${extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
     }
 
-    const age = self.assertRetentionPeriod(user, file.age)
+    const age = self.assertRetentionPeriod(req.locals.user, file.age)
 
     let size = file.size
     if (size === undefined) {
@@ -814,7 +794,7 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
   }))
 
   if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, user, filesData)
+    const scanResult = await self.scanFiles(req, filesData)
     if (scanResult) {
       throw new ClientError(scanResult)
     }
@@ -822,8 +802,8 @@ self.actuallyFinishChunks = async (req, res, user, files) => {
 
   await self.stripTags(req, filesData)
 
-  const result = await self.storeFilesToDb(req, res, user, filesData)
-  return self.sendUploadResponse(req, res, user, result)
+  const result = await self.storeFilesToDb(req, res, filesData)
+  return self.sendUploadResponse(req, res, result)
 }
 
 self.cleanUpChunks = async uuid => {
@@ -883,9 +863,9 @@ self.assertScanFileBypass = data => {
   return false
 }
 
-self.scanFiles = async (req, user, filesData) => {
+self.scanFiles = async (req, filesData) => {
   const filenames = filesData.map(file => file.filename)
-  if (self.assertScanUserBypass(user, filenames)) {
+  if (self.assertScanUserBypass(req.locals.user, filenames)) {
     return false
   }
 
@@ -950,7 +930,7 @@ self.stripTags = async (req, filesData) => {
 
 /** Database functions */
 
-self.storeFilesToDb = async (req, res, user, filesData) => {
+self.storeFilesToDb = async (req, res, filesData) => {
   const files = []
   const exists = []
   const albumids = []
@@ -960,10 +940,10 @@ self.storeFilesToDb = async (req, res, user, filesData) => {
       // Check if the file exists by checking its hash and size
       const dbFile = await utils.db.table('files')
         .where(function () {
-          if (user === undefined) {
-            this.whereNull('userid')
+          if (req.locals.user) {
+            this.where('userid', req.locals.user.id)
           } else {
-            this.where('userid', user.id)
+            this.whereNull('userid')
           }
         })
         .where({
@@ -1002,8 +982,8 @@ self.storeFilesToDb = async (req, res, user, filesData) => {
       timestamp
     }
 
-    if (user) {
-      data.userid = user.id
+    if (req.locals.user) {
+      data.userid = req.locals.user.id
       data.albumid = file.albumid
       if (data.albumid !== null && !albumids.includes(data.albumid)) {
         albumids.push(data.albumid)
@@ -1023,10 +1003,11 @@ self.storeFilesToDb = async (req, res, user, filesData) => {
   }))
 
   if (files.length) {
+    // albumids should be empty if non-registerd users (no auth requests)
     let authorizedIds = []
     if (albumids.length) {
       authorizedIds = await utils.db.table('albums')
-        .where({ userid: user.id })
+        .where({ userid: req.locals.user.id })
         .whereIn('id', albumids)
         .select('id')
         .then(rows => rows.map(row => row.id))
@@ -1057,7 +1038,7 @@ self.storeFilesToDb = async (req, res, user, filesData) => {
 
 /** Final response */
 
-self.sendUploadResponse = async (req, res, user, result) => {
+self.sendUploadResponse = async (req, res, result) => {
   // Send response
   return res.json({
     success: true,
@@ -1079,7 +1060,7 @@ self.sendUploadResponse = async (req, res, user, result) => {
 
       // If uploaded by user, add delete URL (intended for ShareX and its derivatives)
       // Homepage uploader will not use this (use dashboard instead)
-      if (user) {
+      if (req.locals.user) {
         map.deleteUrl = `${utils.conf.homeDomain}/file/${file.name}?delete`
       }
 
@@ -1091,30 +1072,20 @@ self.sendUploadResponse = async (req, res, user, result) => {
 /** Delete uploads */
 
 self.delete = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-
-  // Parse POST body and re-map for .bulkDelete()
-  // Original API used by lolisafe v3's frontend
+  // Re-map Request.body for .bulkDelete()
+  // This is the legacy API used by lolisafe v3's frontend
   // Meanwhile this fork's frontend uses .bulkDelete() straight away
-  req.body = await req.json()
-    .then(obj => {
-      const id = parseInt(obj.id)
-      return {
-        field: 'id',
-        values: isNaN(id) ? undefined : [id]
-      }
-    })
+  const id = parseInt(req.body.id)
+  req.body = {
+    _legacy: true,
+    field: 'id',
+    values: isNaN(id) ? undefined : [id]
+  }
 
   return self.bulkDelete(req, res)
 }
 
 self.bulkDelete = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-
-  // Parse POST body, if required
-  req.body = req.body || await req.json()
-
   const field = req.body.field || 'id'
   const values = req.body.values
 
@@ -1122,7 +1093,7 @@ self.bulkDelete = async (req, res) => {
     throw new ClientError('No array of files specified.')
   }
 
-  const failed = await utils.bulkDeleteFromDb(field, values, user)
+  const failed = await utils.bulkDeleteFromDb(field, values, req.locals.user)
 
   return res.json({ success: true, failed })
 }
@@ -1130,13 +1101,13 @@ self.bulkDelete = async (req, res) => {
 /** List uploads */
 
 self.list = async (req, res) => {
-  const user = await utils.authorize(req)
-
   const all = req.headers.all === '1'
   const filters = req.headers.filters
   const minoffset = Number(req.headers.minoffset) || 0
-  const ismoderator = perms.is(user, 'moderator')
-  if (all && !ismoderator) return res.status(403).end()
+  const ismoderator = perms.is(req.locals.user, 'moderator')
+  if (all && !ismoderator) {
+    return res.status(403).end()
+  }
 
   const albumid = req.path_parameters && Number(req.path_parameters.albumid)
   const basedomain = utils.conf.domain
@@ -1522,7 +1493,7 @@ self.list = async (req, res) => {
       })
     } else {
       // If not listing all uploads, list user's uploads
-      this.where('userid', user.id)
+      this.where('userid', req.locals.user.id)
     }
 
     // Then, refine using any of the supplied 'albumid' keys and/or NULL flag
@@ -1746,8 +1717,7 @@ self.list = async (req, res) => {
 /** Get file info */
 
 self.get = async (req, res) => {
-  const user = await utils.authorize(req)
-  const ismoderator = perms.is(user, 'moderator')
+  const ismoderator = perms.is(req.locals.user, 'moderator')
 
   const identifier = req.path_parameters && req.path_parameters.identifier
   if (identifier === undefined) {
@@ -1757,8 +1727,9 @@ self.get = async (req, res) => {
   const file = await utils.db.table('files')
     .where('name', identifier)
     .where(function () {
+      // Only allow moderators to get any files' information
       if (!ismoderator) {
-        this.where('userid', user.id)
+        this.where('userid', req.locals.user.id)
       }
     })
     .first()

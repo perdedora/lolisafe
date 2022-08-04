@@ -398,33 +398,11 @@ self.assertRequestType = (req, type) => {
   }
 }
 
-self.assertUser = async (token, fields) => {
-  const _fields = ['id', 'username', 'enabled', 'timestamp', 'permission', 'registration']
-  if (typeof fields === 'string') fields = [fields]
-  if (Array.isArray(fields)) {
-    _fields.push(...fields)
-  }
-
-  const user = await self.db.table('users')
-    .where('token', token)
-    .select(_fields)
-    .first()
-  if (user) {
-    if (user.enabled === false || user.enabled === 0) {
-      throw new ClientError('This account has been disabled.', { statusCode: 403 })
-    }
-    return user
-  } else {
-    throw new ClientError('Invalid token.', { statusCode: 403 })
-  }
-}
-
-self.authorize = async (req, fields) => {
-  const token = req.headers.token
-  if (token === undefined) {
-    throw new ClientError('No token provided.', { statusCode: 403 })
-  }
-  return self.assertUser(token, fields)
+self.assertJSON = async (req, res) => {
+  // Assert Request Content-Type
+  self.assertRequestType(req, 'application/json')
+  // Parse JSON payload
+  req.body = await req.json()
 }
 
 self.generateThumbs = async (name, extname, force) => {
@@ -801,10 +779,10 @@ self.invalidateStatsCache = type => {
 }
 
 const generateStats = async (req, res) => {
-  const user = await self.authorize(req)
-
-  const isadmin = perms.is(user, 'admin')
-  if (!isadmin) throw new ClientError('', { statusCode: 403 })
+  const isadmin = perms.is(req.locals.user, 'admin')
+  if (!isadmin) {
+    return res.status(403).end()
+  }
 
   const hrstart = process.hrtime()
   const stats = {}

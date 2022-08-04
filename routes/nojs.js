@@ -1,6 +1,6 @@
 const { Router } = require('hyper-express')
 const routes = new Router()
-const uploadController = require('./../controllers/uploadController')
+const upload = require('./../controllers/uploadController')
 const utils = require('./../controllers/utilsController')
 const config = require('./../config')
 
@@ -24,7 +24,7 @@ routes.post('/nojs', async (req, res) => {
       files: result.files || [{}]
     })
   }
-  return uploadController.upload(req, res)
+  return upload.upload(req, res)
 }, {
   // HyperExpress defaults to 250kb
   // https://github.com/kartikk221/hyper-express/blob/6.2.4/docs/Server.md#server-constructor-options

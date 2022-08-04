@@ -102,18 +102,18 @@ self.unholdAlbumIdentifiers = res => {
 }
 
 self.list = async (req, res) => {
-  const user = await utils.authorize(req)
-
   const all = req.headers.all === '1'
   const simple = req.headers.simple
-  const ismoderator = perms.is(user, 'moderator')
-  if (all && !ismoderator) return res.status(403).end()
+  const ismoderator = perms.is(req.locals.user, 'moderator')
+  if (all && !ismoderator) {
+    return res.status(403).end()
+  }
 
   const filter = function () {
     if (!all) {
       this.where({
         enabled: 1,
-        userid: user.id
+        userid: req.locals.user.id
       })
     }
   }
@@ -227,34 +227,32 @@ self.list = async (req, res) => {
 }
 
 self.create = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-
-  // Parse POST body
-  req.body = await req.json()
-
   const name = typeof req.body.name === 'string'
     ? utils.escape(req.body.name.trim().substring(0, self.titleMaxLength))
     : ''
 
-  if (!name) throw new ClientError('No album name specified.')
+  if (!name) {
+    throw new ClientError('No album name specified.')
+  }
 
   const album = await utils.db.table('albums')
     .where({
       name,
       enabled: 1,
-      userid: user.id
+      userid: req.locals.user.id
     })
     .first()
 
-  if (album) throw new ClientError('Album name already in use.', { statusCode: 403 })
+  if (album) {
+    throw new ClientError('Album name already in use.', { statusCode: 403 })
+  }
 
   const identifier = await self.getUniqueAlbumIdentifier(res)
 
   const ids = await utils.db.table('albums').insert({
     name,
     enabled: 1,
-    userid: user.id,
+    userid: req.locals.user.id,
     identifier,
     timestamp: Math.floor(Date.now() / 1000),
     editedAt: 0,
@@ -272,39 +270,33 @@ self.create = async (req, res) => {
 }
 
 self.delete = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-
-  // Parse POST body and re-map for .disable()
-  req.body = await req.json()
-    .then(obj => {
-      obj.del = true
-      return obj
-    })
+  // Re-map Request.body for .disable()
+  req.body.del = true
 
   return self.disable(req, res)
 }
 
 self.disable = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-  const ismoderator = perms.is(user, 'moderator')
-
-  // Parse POST body, if required
-  req.body = req.body || await req.json()
+  const ismoderator = perms.is(req.locals.user, 'moderator')
 
   const id = parseInt(req.body.id)
-  if (isNaN(id)) throw new ClientError('No album specified.')
+  if (isNaN(id)) {
+    throw new ClientError('No album specified.')
+  }
 
   const purge = req.body.purge
+
+  // Only allow moderators to delete other users' albums
   const del = ismoderator ? req.body.del : false
 
   const filter = function () {
     this.where('id', id)
 
+    // Only allow moderators to disable other users' albums
     if (!ismoderator) {
       this.andWhere({
         enabled: 1,
-        userid: user.id
+        userid: req.locals.user.id
       })
     }
   }
@@ -326,7 +318,7 @@ self.disable = async (req, res) => {
 
     if (files.length) {
       const ids = files.map(file => file.id)
-      const failed = await utils.bulkDeleteFromDb('id', ids, user)
+      const failed = await utils.bulkDeleteFromDb('id', ids, req.locals.user)
       if (failed.length) {
         return res.json({ success: false, failed })
       }
@@ -352,36 +344,38 @@ self.disable = async (req, res) => {
     await paths.unlink(path.join(paths.zips, `${album.identifier}.zip`))
   } catch (error) {
     // Re-throw non-ENOENT error
-    if (error.code !== 'ENOENT') throw error
+    if (error.code !== 'ENOENT') {
+      throw error
+    }
   }
 
   return res.json({ success: true })
 }
 
 self.edit = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-  const ismoderator = perms.is(user, 'moderator')
-
-  // Parse POST body, if required
-  req.body = req.body || await req.json()
+  const ismoderator = perms.is(req.locals.user, 'moderator')
 
   const id = parseInt(req.body.id)
-  if (isNaN(id)) throw new ClientError('No album specified.')
+  if (isNaN(id)) {
+    throw new ClientError('No album specified.')
+  }
 
   const name = typeof req.body.name === 'string'
     ? utils.escape(req.body.name.trim().substring(0, self.titleMaxLength))
     : ''
 
-  if (!name) throw new ClientError('No album name specified.')
+  if (!name) {
+    throw new ClientError('No album name specified.')
+  }
 
   const filter = function () {
     this.where('id', id)
 
+    // Only allow moderators to edit other users' albums
     if (!ismoderator) {
       this.andWhere({
         enabled: 1,
-        userid: user.id
+        userid: req.locals.user.id
       })
     }
   }
@@ -402,14 +396,14 @@ self.edit = async (req, res) => {
     .where({
       name,
       enabled: 1,
-      userid: user.id
+      userid: req.locals.user.id
     })
     .whereNot('id', id)
     .first()
 
   if ((album.enabled || (albumNewState === true)) && nameInUse) {
-    if (req._old) {
-      // Old rename API (stick with 200 status code for this)
+    if (req._legacy) {
+      // Legacy rename API (stick with 200 status code for this)
       throw new ClientError('You did not specify a new name.', { statusCode: 200 })
     } else {
       throw new ClientError('Album name already in use.', { statusCode: 403 })
@@ -448,7 +442,9 @@ self.edit = async (req, res) => {
       await paths.rename(oldZip, newZip)
     } catch (error) {
       // Re-throw non-ENOENT error
-      if (error.code !== 'ENOENT') throw error
+      if (error.code !== 'ENOENT') {
+        throw error
+      }
     }
 
     return res.json({
@@ -461,16 +457,11 @@ self.edit = async (req, res) => {
 }
 
 self.rename = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-
-  // Parse POST body and re-map for .edit()
-  req.body = await req.json()
-    .then(obj => {
-      return {
-        _old: true,
-        name: obj.name
-      }
-    })
+  // Re-map Request.body for .edit()
+  req.body = {
+    _legacy: true,
+    name: req.body.name
+  }
 
   return self.edit(req, res)
 }
@@ -529,6 +520,7 @@ self.getUpstreamCompat = async (req, res) => {
   // map to .get() with chibisafe/upstream compatibility
   // This API is known to be used in Pitu/Magane
   req.locals.upstreamCompat = true
+
   res._json = res.json
   res.json = (body = {}) => {
     // Rebuild JSON payload to match lolisafe upstream
@@ -549,7 +541,10 @@ self.getUpstreamCompat = async (req, res) => {
       }
     })
 
-    if (rebuild.message) rebuild.message = rebuild.message.replace(/\.$/, '')
+    if (rebuild.message) {
+      rebuild.message = rebuild.message.replace(/\.$/, '')
+    }
+
     return res._json(rebuild)
   }
 
@@ -593,7 +588,9 @@ self.generateZip = async (req, res) => {
       return
     } catch (error) {
       // Re-throw non-ENOENT error
-      if (error.code !== 'ENOENT') throw error
+      if (error.code !== 'ENOENT') {
+        throw error
+      }
     }
   }
 
@@ -673,19 +670,15 @@ self.generateZip = async (req, res) => {
 }
 
 self.addFiles = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-
-  // Parse POST body
-  req.body = await req.json()
-
   const ids = req.body.ids
   if (!Array.isArray(ids) || !ids.length) {
     throw new ClientError('No files specified.')
   }
 
   let albumid = parseInt(req.body.albumid)
-  if (isNaN(albumid) || albumid < 0) albumid = null
+  if (isNaN(albumid) || albumid < 0) {
+    albumid = null
+  }
 
   const failed = []
   const albumids = []
@@ -694,8 +687,10 @@ self.addFiles = async (req, res) => {
       const album = await utils.db.table('albums')
         .where('id', albumid)
         .where(function () {
-          if (user.username !== 'root') {
-            this.where('userid', user.id)
+          // Only allow "root" user to arbitrarily add/remove files to/from any albums
+          // NOTE: Dashboard does not facilitate this, intended for manual API calls
+          if (req.locals.user.username !== 'root') {
+            this.where('userid', req.locals.user.id)
           }
         })
         .first()
@@ -709,7 +704,7 @@ self.addFiles = async (req, res) => {
 
     const files = await utils.db.table('files')
       .whereIn('id', ids)
-      .where('userid', user.id)
+      .where('userid', req.locals.user.id)
 
     failed.push(...ids.filter(id => !files.find(file => file.id === id)))
 

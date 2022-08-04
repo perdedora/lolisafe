@@ -35,27 +35,79 @@ const usersPerPage = config.dashboard
   ? Math.max(Math.min(config.dashboard.usersPerPage || 0, 100), 1)
   : 25
 
+self.assertUser = async (token, fields) => {
+  // Default fields/columns to fetch from database
+  const _fields = ['id', 'username', 'enabled', 'timestamp', 'permission', 'registration']
+
+  // Allow fetching additional fields/columns
+  if (typeof fields === 'string') {
+    fields = [fields]
+  }
+  if (Array.isArray(fields)) {
+    _fields.push(...fields)
+  }
+
+  const user = await utils.db.table('users')
+    .where('token', token)
+    .select(_fields)
+    .first()
+  if (user) {
+    if (user.enabled === false || user.enabled === 0) {
+      throw new ClientError('This account has been disabled.', { statusCode: 403 })
+    }
+    return user
+  } else {
+    throw new ClientError('Invalid token.', { statusCode: 403 })
+  }
+}
+
+// _ is next() if this was a synchronous middleware function
+self.requireUser = async (req, res, _, fields) => {
+  // Throws when token is missing, thus use only for users-only routes
+  const token = req.headers.token
+  if (token === undefined) {
+    throw new ClientError('No token provided.', { statusCode: 403 })
+  }
+
+  // Add user data to Request.locals.user
+  req.locals.user = await self.assertUser(token, fields)
+}
+
+// _ is next() if this was a synchronous middleware function
+self.optionalUser = async (req, res, _, fields) => {
+  // Throws when token if missing only when private is set to true in config,
+  // thus use for routes that can handle no auth requests
+  const token = req.headers.token
+  if (token) {
+    // Add user data to Request.locals.user
+    req.locals.user = await self.assertUser(token, fields)
+  } else if (config.private === true) {
+    throw new ClientError('No token provided.', { statusCode: 403 })
+  }
+}
+
 self.verify = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-
-  // Parse POST body
-  req.body = await req.json()
-
   const username = typeof req.body.username === 'string'
     ? req.body.username.trim()
     : ''
-  if (!username) throw new ClientError('No username provided.')
+  if (!username) {
+    throw new ClientError('No username provided.')
+  }
 
   const password = typeof req.body.password === 'string'
     ? req.body.password.trim()
     : ''
-  if (!password) throw new ClientError('No password provided.')
+  if (!password) {
+    throw new ClientError('No password provided.')
+  }
 
   const user = await utils.db.table('users')
     .where('username', username)
     .first()
 
-  if (!user) throw new ClientError('Wrong credentials.', { statusCode: 403 })
+  if (!user) {
+    throw new ClientError('Wrong credentials.', { statusCode: 403 })
+  }
 
   if (user.enabled === false || user.enabled === 0) {
     throw new ClientError('This account has been disabled.', { statusCode: 403 })
@@ -70,11 +122,6 @@ self.verify = async (req, res) => {
 }
 
 self.register = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-
-  // Parse POST body
-  req.body = await req.json()
-
   if (config.enableUserAccounts === false) {
     throw new ClientError('Registration is currently disabled.', { statusCode: 403 })
   }
@@ -119,12 +166,6 @@ self.register = async (req, res) => {
 }
 
 self.changePassword = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-
-  // Parse POST body
-  req.body = await req.json()
-
   const password = typeof req.body.password === 'string'
     ? req.body.password.trim()
     : ''
@@ -135,7 +176,7 @@ self.changePassword = async (req, res) => {
   const hash = await bcrypt.hash(password, saltRounds)
 
   await utils.db.table('users')
-    .where('id', user.id)
+    .where('id', req.locals.user.id)
     .update('password', hash)
 
   return res.json({ success: true })
@@ -152,14 +193,10 @@ self.assertPermission = (user, target) => {
 }
 
 self.createUser = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-
-  // Parse POST body
-  req.body = await req.json()
-
-  const isadmin = perms.is(user, 'admin')
-  if (!isadmin) return res.status(403).end()
+  const isadmin = perms.is(req.locals.user, 'admin')
+  if (!isadmin) {
+    return res.status(403).end()
+  }
 
   const username = typeof req.body.username === 'string'
     ? req.body.username.trim()
@@ -215,22 +252,22 @@ self.createUser = async (req, res) => {
 }
 
 self.editUser = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-
-  // Parse POST body, if required
-  req.body = req.body || await req.json()
-
-  const isadmin = perms.is(user, 'admin')
-  if (!isadmin) throw new ClientError('', { statusCode: 403 })
+  const isadmin = perms.is(req.locals.user, 'admin')
+  if (!isadmin) {
+    return res.status(403).end()
+  }
 
   const id = parseInt(req.body.id)
-  if (isNaN(id)) throw new ClientError('No user specified.')
+  if (isNaN(id)) {
+    throw new ClientError('No user specified.')
+  }
 
   const target = await utils.db.table('users')
     .where('id', id)
     .first()
-  self.assertPermission(user, target)
+
+  // Ensure this user has permission to tamper with target user
+  self.assertPermission(req.locals.user, target)
 
   const update = {}
 
@@ -272,38 +309,33 @@ self.editUser = async (req, res) => {
 }
 
 self.disableUser = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-
-  // Parse POST body and re-map for .editUser()
-  req.body = await req.json()
-    .then(obj => {
-      return {
-        id: obj.id,
-        enabled: false
-      }
-    })
+  // Re-map Request.body for .editUser()
+  req.body = {
+    id: req.body.id,
+    enabled: false
+  }
 
   return self.editUser(req, res)
 }
 
 self.deleteUser = async (req, res) => {
-  utils.assertRequestType(req, 'application/json')
-  const user = await utils.authorize(req)
-
-  // Parse POST body
-  req.body = await req.json()
-
-  const isadmin = perms.is(user, 'admin')
-  if (!isadmin) throw new ClientError('', { statusCode: 403 })
+  const isadmin = perms.is(req.locals.user, 'admin')
+  if (!isadmin) {
+    return res.status(403).end()
+  }
 
   const id = parseInt(req.body.id)
   const purge = req.body.purge
-  if (isNaN(id)) throw new ClientError('No user specified.')
+  if (isNaN(id)) {
+    throw new ClientError('No user specified.')
+  }
 
   const target = await utils.db.table('users')
     .where('id', id)
     .first()
-  self.assertPermission(user, target)
+
+  // Ensure this user has permission to tamper with target user
+  self.assertPermission(req.locals.user, target)
 
   const files = await utils.db.table('files')
     .where('userid', id)
@@ -312,7 +344,7 @@ self.deleteUser = async (req, res) => {
   if (files.length) {
     const fileids = files.map(file => file.id)
     if (purge) {
-      const failed = await utils.bulkDeleteFromDb('id', fileids, user)
+      const failed = await utils.bulkDeleteFromDb('id', fileids, req.locals.user)
       utils.invalidateStatsCache('uploads')
       if (failed.length) {
         return res.json({ success: false, failed })
@@ -361,10 +393,10 @@ self.bulkDeleteUsers = async (req, res) => {
 }
 
 self.listUsers = async (req, res) => {
-  const user = await utils.authorize(req)
-
-  const isadmin = perms.is(user, 'admin')
-  if (!isadmin) throw new ClientError('', { statusCode: 403 })
+  const isadmin = perms.is(req.locals.user, 'admin')
+  if (!isadmin) {
+    return res.status(403).end()
+  }
 
   // Base result object
   const result = { success: true, users: [], usersPerPage, count: 0 }
