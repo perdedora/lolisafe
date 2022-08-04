@@ -219,18 +219,6 @@ module.exports = {
   */
   rateLimiters: [
     {
-      // 2 requests in 5 seconds
-      routes: [
-        // If multiple routes, they will share the same points pool
-        '/api/login',
-        '/api/register'
-      ],
-      options: {
-        points: 2,
-        duration: 5
-      }
-    },
-    {
       // 6 requests in 30 seconds
       routes: [
         '/api/album/zip'

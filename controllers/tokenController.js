@@ -12,8 +12,8 @@ const self = {
 
   onHold: new Set(), // temporarily held random tokens
 
-  // Maximum of 6 token auth failures in 10 minutes
-  invalidTokenRateLimiter: new RateLimiterMemory({
+  // Maximum of 6 auth failures in 10 minutes
+  authFailuresRateLimiter: new RateLimiterMemory({
     points: 6,
     duration: 10 * 60
   })
@@ -78,9 +78,9 @@ self.verify = async (req, res) => {
     throw new ClientError('No token provided.', { statusCode: 403 })
   }
 
-  const rateLimiterRes = await self.invalidTokenRateLimiter.get(req.ip)
+  const rateLimiterRes = await self.authFailuresRateLimiter.get(req.ip)
   if (rateLimiterRes && rateLimiterRes.remainingPoints <= 0) {
-    throw new ClientError('Too many requests with invalid token. Try again in a while.', { statusCode: 429 })
+    throw new ClientError('Too many auth failures. Try again in a while.', { statusCode: 429 })
   }
 
   const user = await utils.db.table('users')
@@ -90,7 +90,7 @@ self.verify = async (req, res) => {
 
   if (!user) {
     // Rate limit attempts with invalid token
-    await self.invalidTokenRateLimiter.consume(req.ip, 1)
+    await self.authFailuresRateLimiter.consume(req.ip, 1)
     throw new ClientError('Invalid token.', { statusCode: 403, code: 10001 })
   }
 

@@ -36,12 +36,12 @@ const usersPerPage = config.dashboard
   : 25
 
 // ip is an optional parameter, which if set will be rate limited
-// using tokens.invalidTokenRateLimiter pool
+// using tokens.authFailuresRateLimiter pool
 self.assertUser = async (token, fields, ip) => {
   if (ip) {
-    const rateLimiterRes = await tokens.invalidTokenRateLimiter.get(ip)
+    const rateLimiterRes = await tokens.authFailuresRateLimiter.get(ip)
     if (rateLimiterRes && rateLimiterRes.remainingPoints <= 0) {
-      throw new ClientError('Too many requests with invalid token. Try again in a while.', { statusCode: 429 })
+      throw new ClientError('Too many auth failures. Try again in a while.', { statusCode: 429 })
     }
   }
 
@@ -68,7 +68,7 @@ self.assertUser = async (token, fields, ip) => {
   } else {
     if (ip) {
       // Rate limit attempts with invalid token
-      await tokens.invalidTokenRateLimiter.consume(ip, 1)
+      await tokens.authFailuresRateLimiter.consume(ip, 1)
     }
     throw new ClientError('Invalid token.', { statusCode: 403, code: 10001 })
   }
@@ -122,11 +122,18 @@ self.verify = async (req, res) => {
     throw new ClientError('No password provided.')
   }
 
+  // Use tokens.authFailuresRateLimiter pool for /api/login as well
+  const rateLimiterRes = await tokens.authFailuresRateLimiter.get(req.ip)
+  if (rateLimiterRes && rateLimiterRes.remainingPoints <= 0) {
+    throw new ClientError('Too many auth failures. Try again in a while.', { statusCode: 429 })
+  }
+
   const user = await utils.db.table('users')
     .where('username', username)
     .first()
 
   if (!user) {
+    await tokens.authFailuresRateLimiter.consume(req.ip, 1)
     throw new ClientError('Wrong credentials.', { statusCode: 403 })
   }
 
@@ -136,6 +143,7 @@ self.verify = async (req, res) => {
 
   const result = await bcrypt.compare(password, user.password)
   if (result === false) {
+    await tokens.authFailuresRateLimiter.consume(req.ip, 1)
     throw new ClientError('Wrong credentials.', { statusCode: 403 })
   } else {
     return res.json({ success: true, token: user.token })
@@ -161,11 +169,22 @@ self.register = async (req, res) => {
     throw new ClientError(`Password must have ${self.pass.min}-${self.pass.max} characters.`)
   }
 
+  // Use tokens.authFailuresRateLimiter pool for /api/register as well
+  const rateLimiterRes = await tokens.authFailuresRateLimiter.get(req.ip)
+  if (rateLimiterRes && rateLimiterRes.remainingPoints <= 0) {
+    throw new ClientError('Too many auth failures. Try again in a while.', { statusCode: 429 })
+  }
+
   const user = await utils.db.table('users')
     .where('username', username)
     .first()
 
-  if (user) throw new ClientError('Username already exists.')
+  if (user) {
+    // Also consume rate limit to protect this route
+    // from being brute-forced to find existing usernames
+    await tokens.authFailuresRateLimiter.consume(req.ip, 1)
+    throw new ClientError('Username already exists.')
+  }
 
   const hash = await bcrypt.hash(password, saltRounds)
 
