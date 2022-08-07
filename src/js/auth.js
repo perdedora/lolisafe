@@ -37,8 +37,28 @@ page.unhide = () => {
   if (floatingBtn) floatingBtn.classList.remove('is-hidden')
 }
 
+// Handler for regular JS errors
+page.onError = error => {
+  console.error(error)
+
+  const content = document.createElement('div')
+  content.innerHTML = `
+    <p><code>${error.toString()}</code></p>
+    <p>Please check your console for more information.</p>
+  `
+  return swal({
+    title: 'An error occurred!',
+    icon: 'error',
+    content
+  })
+}
+
 // Handler for Axios errors
 page.onAxiosError = error => {
+  if (!error.response) {
+    return page.onError(error)
+  }
+
   const statusText = page.cloudflareErrors[error.response.status] || error.response.statusText
   const description = error.response.data && error.response.data.description
     ? error.response.data.description

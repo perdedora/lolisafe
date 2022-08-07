@@ -147,6 +147,10 @@ page.onError = error => {
 
 // Handler for Axios errors
 page.onAxiosError = error => {
+  if (!error.response) {
+    return page.onError(error)
+  }
+
   const statusText = page.cloudflareErrors[error.response.status] || error.response.statusText
   const description = error.response.data && error.response.data.description
     ? error.response.data.description
