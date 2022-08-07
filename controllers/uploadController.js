@@ -1651,14 +1651,19 @@ self.list = async (req, res) => {
     offset = Math.max(0, Math.ceil(result.count / uploadsPerPage) + offset)
   }
 
+  // Database columns to query
   const columns = ['id', 'name', 'original', 'userid', 'size', 'timestamp']
+
   if (utils.retentions.enabled) {
     columns.push('expirydate')
   }
-  if (!all ||
-    filterObj.queries.albumid ||
+
+  const filterByAlbums = filterObj.queries.albumid ||
     filterObj.queries.exclude.albumid ||
-    filterObj.flags.albumidNull !== undefined) {
+    filterObj.flags.albumidNull !== undefined
+
+  // If not listing all uploads, OR specifically filtering by album IDs
+  if (!all || filterByAlbums) {
     columns.push('albumid')
   }
 
@@ -1702,16 +1707,23 @@ self.list = async (req, res) => {
 
   result.albums = {}
 
-  // If we queried albumid, query album names
-  if (columns.includes('albumid')) {
+  // If not listing all uploads, OR specifically filtering by album IDs
+  if (!all || filterByAlbums) {
     const albumids = result.files
       .map(file => file.albumid)
       .filter(utils.filterUniquifySqlArray)
 
     result.albums = await utils.db.table('albums')
-      .whereIn('id', albumids)
-      .where('enabled', 1)
-      .select('id', 'name')
+      .where(function () {
+        this.whereIn('id', albumids)
+
+        // Only include data of disabled albums if listing all uploads
+        // and filtering by album IDs
+        if (!all) {
+          this.andWhere('enabled', 1)
+        }
+      })
+      .select('id', 'name', 'enabled')
       .then(rows => {
         // Build Object indexed by their IDs
         const obj = {}
@@ -1720,12 +1732,19 @@ self.list = async (req, res) => {
         }
         return obj
       })
+
+    // If filtering by album IDs,
+    // then filter out uploads with missing albums data (assume disabled/deleted)
+    if (filterByAlbums) {
+      result.files = result.files.filter(file => result.albums[file.albumid] !== undefined)
+    }
   }
 
   // If we are not listing all uploads, send response
   if (!all) {
     return res.json(result)
   }
+
   // Otherwise proceed to querying usernames
   let usersTable = filterObj.uploaders
   if (!usersTable.length) {

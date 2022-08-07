@@ -674,8 +674,9 @@ page.getUploads = (params = {}) => {
     // Whether there are any unselected items
     let unselected = false
 
-    const showOriginalNames = page.views[page.currentView].originalNames
+    const filterAllByAlbums = params.all && params.filters && params.filters.includes('albumid:')
     const hasExpiryDateColumn = files.some(file => typeof file.expirydate !== 'undefined')
+    const showOriginalNames = page.views[page.currentView].originalNames
 
     for (let i = 0; i < files.length; i++) {
       // Build full URLs
@@ -710,8 +711,14 @@ page.getUploads = (params = {}) => {
       }
 
       // Prettify
+      files[i].prettyAlbum = (albums && files[i].albumid && albums[files[i].albumid])
+        ? `[${files[i].albumid}] ${albums[files[i].albumid]}` || ''
+        : ''
       files[i].prettyBytes = page.getPrettyBytes(parseInt(files[i].size))
       files[i].prettyDate = page.getPrettyDate(new Date(files[i].timestamp * 1000))
+      files[i].prettyUser = (users && files[i].userid && users[files[i].userid])
+        ? users[files[i].userid]
+        : ''
 
       if (hasExpiryDateColumn) {
         files[i].prettyExpiryDate = files[i].expirydate
@@ -723,17 +730,6 @@ page.getUploads = (params = {}) => {
       files[i].selected = page.selected[page.currentView].includes(files[i].id)
       if (!files[i].selected) {
         unselected = true
-      }
-
-      // Appendix (display album or user)
-      if (params.all) {
-        files[i].appendix = files[i].userid
-          ? users[files[i].userid] || ''
-          : ''
-      } else if (typeof params.album === 'undefined') {
-        files[i].appendix = files[i].albumid
-          ? `[${files[i].albumid}] ${albums[files[i].albumid]}` || ''
-          : ''
       }
     }
 
@@ -753,14 +749,22 @@ page.getUploads = (params = {}) => {
 
       for (let i = 0; i < files.length; i++) {
         const upload = files[i]
+        let appendix = ''
+        if (params.all) {
+          appendix += upload.prettyUser ? `<span>${upload.prettyUser}</span> \u2013 ` : ''
+        }
+        if (!params.all || filterAllByAlbums) {
+          appendix += upload.prettyAlbum ? `<span>${upload.prettyAlbum}</span> \u2013 ` : ''
+        }
+
         const div = document.createElement('div')
         div.className = 'image-container column'
         div.dataset.id = upload.id
 
-        if (typeof upload.thumb !== 'undefined') {
-          div.innerHTML = `<a class="image" href="${upload.file}" target="_blank"><img alt="${upload.name}" data-src="${upload.thumb}"/></a>`
-        } else {
+        if (upload.thumb === undefined) {
           div.innerHTML = `<a class="image" href="${upload.file}" target="_blank"><h1 class="title">${upload.extname || 'N/A'}</h1></a>`
+        } else {
+          div.innerHTML = `<a class="image" href="${upload.file}" target="_blank"><img alt="${upload.name}" data-src="${upload.thumb}"/></a>`
         }
 
         div.innerHTML += `
@@ -797,7 +801,7 @@ page.getUploads = (params = {}) => {
           <div class="details">
             <p class="name" title="${upload.file}">${upload.name}</p>
             ${showOriginalNames ? `<p class="originalname" title="${upload.original}">${upload.original}</p>` : ''}
-            <p class="prettybytes" data-bytes="${upload.size}">${upload.appendix ? `<span>${upload.appendix}</span> – ` : ''}${upload.prettyBytes}</p>
+            <p class="prettybytes" data-bytes="${upload.size}">${appendix}${upload.prettyBytes}</p>
             ${hasExpiryDateColumn && upload.prettyExpiryDate
               ? `<p class="prettyexpirydate"${upload.expirydate ? ` data-timestamp="${upload.expirydate}"` : ''}>EXP: ${upload.prettyExpiryDate}</p>`
               : ''}
@@ -808,7 +812,6 @@ page.getUploads = (params = {}) => {
         page.checkboxes = table.querySelectorAll('.checkbox[data-action="select"]')
       }
     } else {
-      const allAlbums = params.all && params.filters && params.filters.includes('albumid:')
       page.dom.innerHTML = `
         ${pagination}
         ${extraControls}
@@ -820,8 +823,8 @@ page.getUploads = (params = {}) => {
                 <th class="controls"><input id="selectAll" class="checkbox" type="checkbox" title="Select all" data-action="select-all"></th>
                 <th title="Key: name">File name</th>
                 ${showOriginalNames ? '<th title="Key: original">Original name</th>' : ''}
-                ${typeof params.album === 'undefined' ? `<th title="Key: ${params.all ? 'userid">User' : 'albumid">Album'}</th>` : ''}
-                ${allAlbums ? '<th title="Key: albumid">Album</th>' : ''}
+                ${params.all ? '<th title="Key: userid">User</th>' : ''}
+                ${!params.all || filterAllByAlbums ? '<th title="Key: albumid">Album</th>' : ''}
                 <th title="Key: size">Size</th>
                 ${params.all ? '<th title="Key: ip">IP</th>' : ''}
                 <th title="Key: timestamp">Upload date</th>
@@ -842,14 +845,15 @@ page.getUploads = (params = {}) => {
 
       for (let i = 0; i < files.length; i++) {
         const upload = files[i]
+
         const tr = document.createElement('tr')
         tr.dataset.id = upload.id
         tr.innerHTML = `
           <td class="controls"><input type="checkbox" class="checkbox" title="Select" data-index="${i}" data-action="select"${upload.selected ? ' checked' : ''}></td>
           <th class="name"><a href="${upload.file}" target="_blank" title="${upload.file}">${upload.name}</a></th>
           ${showOriginalNames ? `<th class="originalname" title="${upload.original}">${upload.original}</th>` : ''}
-          ${typeof params.album === 'undefined' ? `<th class="appendix">${upload.appendix}</th>` : ''}
-          ${allAlbums ? `<th class="album">${upload.albumid ? (`[${upload.albumid}] ${albums[upload.albumid]}` || '') : ''}</th>` : ''}
+          ${params.all ? `<th class="appendix">${upload.prettyUser}</th>` : ''}
+          ${!params.all || filterAllByAlbums ? `<th class="album">${upload.prettyAlbum}</th>` : ''}
           <td class="prettybytes" data-bytes="${upload.size}">${upload.prettyBytes}</td>
           ${params.all ? `<td class="ip">${upload.ip || ''}</td>` : ''}
           <td class="prettydate" data-timestamp="${upload.timestamp}">${upload.prettyDate}</td>
