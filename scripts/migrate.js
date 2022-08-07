@@ -55,7 +55,7 @@ const map = {
     .where('username', 'root')
     .select('permission')
     .first()
-  if (root.permission !== perms.permissions.superadmin) {
+  if (root && root.permission !== perms.permissions.superadmin) {
     await db.table('users')
       .where('username', 'root')
       .first()

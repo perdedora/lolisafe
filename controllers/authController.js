@@ -162,6 +162,13 @@ self.register = async (req, res) => {
     throw new ClientError(`Username must have ${self.user.min}-${self.user.max} characters.`)
   }
 
+  // Please be advised that root user is hard-coded to always have superadmin permission
+  // However, you may choose to delete the root user via direct database query,
+  // so it is also hard-coded to always prevent it from being re-created via the API
+  if (username === 'root') {
+    throw new ClientError('Username is reserved.')
+  }
+
   const password = typeof req.body.password === 'string'
     ? req.body.password.trim()
     : ''
@@ -245,6 +252,10 @@ self.createUser = async (req, res) => {
     throw new ClientError(`Username must have ${self.user.min}-${self.user.max} characters.`)
   }
 
+  if (username === 'root') {
+    throw new ClientError('Username is reserved.')
+  }
+
   let password = typeof req.body.password === 'string'
     ? req.body.password.trim()
     : ''
@@ -270,7 +281,9 @@ self.createUser = async (req, res) => {
     .where('username', username)
     .first()
 
-  if (exists) throw new ClientError('Username already exists.')
+  if (exists) {
+    throw new ClientError('Username already exists.')
+  }
 
   const hash = await bcrypt.hash(password, saltRounds)
 
