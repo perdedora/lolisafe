@@ -249,20 +249,21 @@ self.create = async (req, res) => {
 
   const identifier = await self.getUniqueAlbumIdentifier(res)
 
-  const ids = await utils.db.table('albums').insert({
-    name,
-    enabled: 1,
-    userid: req.locals.user.id,
-    identifier,
-    timestamp: Math.floor(Date.now() / 1000),
-    editedAt: 0,
-    zipGeneratedAt: 0,
-    download: (req.body.download === false || req.body.download === 0) ? 0 : 1,
-    public: (req.body.public === false || req.body.public === 0) ? 0 : 1,
-    description: typeof req.body.description === 'string'
-      ? utils.escape(req.body.description.trim().substring(0, self.descMaxLength))
-      : ''
-  })
+  const ids = await utils.db.table('albums')
+    .insert({
+      name,
+      enabled: 1,
+      userid: req.locals.user.id,
+      identifier,
+      timestamp: Math.floor(Date.now() / 1000),
+      editedAt: 0,
+      zipGeneratedAt: 0,
+      download: (req.body.download === false || req.body.download === 0) ? 0 : 1,
+      public: (req.body.public === false || req.body.public === 0) ? 0 : 1,
+      description: typeof req.body.description === 'string'
+        ? utils.escape(req.body.description.trim().substring(0, self.descMaxLength))
+        : ''
+    })
 
   utils.invalidateStatsCache('albums')
 
