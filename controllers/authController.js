@@ -230,12 +230,10 @@ self.changePassword = async (req, res) => {
 }
 
 self.assertPermission = (user, target) => {
-  if (!target) {
-    throw new ClientError('Could not get user with the specified ID.')
+  if (target.username === 'root') {
+    throw new ClientError('User "root" may not be tampered with.', { statusCode: 403 })
   } else if (!perms.higher(user, target)) {
     throw new ClientError('The user is in the same or higher group as you.', { statusCode: 403 })
-  } else if (target.username === 'root') {
-    throw new ClientError('Root user may not be tampered with.', { statusCode: 403 })
   }
 }
 
@@ -319,6 +317,10 @@ self.editUser = async (req, res) => {
     .where('id', id)
     .first()
 
+  if (!target) {
+    throw new ClientError('Could not get user with the specified ID.')
+  }
+
   // Ensure this user has permission to tamper with target user
   self.assertPermission(req.locals.user, target)
 
@@ -386,6 +388,10 @@ self.deleteUser = async (req, res) => {
   const target = await utils.db.table('users')
     .where('id', id)
     .first()
+
+  if (!target) {
+    throw new ClientError('Could not get user with the specified ID.')
+  }
 
   // Ensure this user has permission to tamper with target user
   self.assertPermission(req.locals.user, target)
