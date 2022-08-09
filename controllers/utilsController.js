@@ -628,6 +628,8 @@ self.bulkDeleteFromDb = async (field, values, user) => {
     const unlinkeds = []
     const albumids = []
 
+    // NOTE: Not wrapped within a Transaction because
+    // we cannot rollback files physically unlinked from the storage
     await Promise.all(chunks.map(async chunk => {
       const files = await self.db.table('files')
         .whereIn(field, chunk)
@@ -666,7 +668,7 @@ self.bulkDeleteFromDb = async (field, values, user) => {
         if (file.albumid && !albumids.includes(file.albumid)) {
           albumids.push(file.albumid)
         }
-        // Delete form Content-Disposition store if used
+        // Delete from Content-Disposition store if used
         if (self.contentDispositionStore) {
           self.contentDispositionStore.delete(file.name)
         }

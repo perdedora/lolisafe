@@ -676,6 +676,8 @@ self.addFiles = async (req, res) => {
     throw new ClientError('No files specified.')
   }
 
+  const issuperadmin = perms.is(req.locals.user, 'superadmin')
+
   let albumid = parseInt(req.body.albumid)
   if (isNaN(albumid) || albumid < 0) {
     albumid = null
@@ -683,14 +685,16 @@ self.addFiles = async (req, res) => {
 
   const failed = []
   const albumids = []
+
+  // Wrap within a Promise then-async block for custom error handling
   return Promise.resolve().then(async () => {
     if (albumid !== null) {
       const album = await utils.db.table('albums')
         .where('id', albumid)
         .where(function () {
-          // Only allow "root" user to arbitrarily add/remove files to/from any albums
+          // Only allow superadmins to arbitrarily add/remove files to/from any albums
           // NOTE: Dashboard does not facilitate this, intended for manual API calls
-          if (req.locals.user.username !== 'root') {
+          if (!issuperadmin) {
             this.where('userid', req.locals.user.id)
           }
         })
@@ -700,30 +704,38 @@ self.addFiles = async (req, res) => {
         throw new ClientError('Album does not exist or it does not belong to the user.', { statusCode: 404 })
       }
 
+      // Insert this album's ID into "albumids" array to be updated later
       albumids.push(albumid)
     }
 
+    // Query all owned files matching submitted IDs
     const files = await utils.db.table('files')
       .whereIn('id', ids)
       .where('userid', req.locals.user.id)
 
+    // Push IDs not found in database into "failed" array
     failed.push(...ids.filter(id => !files.find(file => file.id === id)))
 
-    await utils.db.table('files')
-      .whereIn('id', files.map(file => file.id))
-      .update('albumid', albumid)
-    utils.invalidateStatsCache('albums')
+    await utils.db.transaction(async trx => {
+      // Update files' associated album IDs
+      await trx('files')
+        .whereIn('id', files.map(file => file.id))
+        .update('albumid', albumid)
+      utils.invalidateStatsCache('albums')
 
-    files.forEach(file => {
-      if (file.albumid && !albumids.includes(file.albumid)) {
-        albumids.push(file.albumid)
-      }
+      // Insert all previous albums' IDs into "albumids" array to be updated later
+      files.forEach(file => {
+        if (file.albumid && !albumids.includes(file.albumid)) {
+          albumids.push(file.albumid)
+        }
+      })
+
+      // Update all relevant albums' "editedAt" timestamp
+      await trx('albums')
+        .whereIn('id', albumids)
+        .update('editedAt', Math.floor(Date.now() / 1000))
+      utils.deleteStoredAlbumRenders(albumids)
     })
-
-    await utils.db.table('albums')
-      .whereIn('id', albumids)
-      .update('editedAt', Math.floor(Date.now() / 1000))
-    utils.deleteStoredAlbumRenders(albumids)
 
     return res.json({ success: true, failed })
   }).catch(error => {
