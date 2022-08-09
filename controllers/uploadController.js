@@ -1059,17 +1059,20 @@ self.storeFilesToDb = async (req, res, filesData) => {
       }
     }
 
-    // Insert new files to DB
-    await utils.db.table('files').insert(files)
-    utils.invalidateStatsCache('uploads')
+    await utils.db.transaction(async trx => {
+      // Insert new files to DB
+      await trx('files')
+        .insert(files)
+      utils.invalidateStatsCache('uploads')
 
-    // Update albums' timestamp
-    if (authorizedIds.length) {
-      await utils.db.table('albums')
-        .whereIn('id', authorizedIds)
-        .update('editedAt', Math.floor(Date.now() / 1000))
-      utils.deleteStoredAlbumRenders(authorizedIds)
-    }
+      // Update albums' timestamp
+      if (authorizedIds.length) {
+        await trx('albums')
+          .whereIn('id', authorizedIds)
+          .update('editedAt', Math.floor(Date.now() / 1000))
+        utils.deleteStoredAlbumRenders(authorizedIds)
+      }
+    })
   }
 
   return [...files, ...exists]
