@@ -1,4 +1,4 @@
-{%- import '_globals.njk' as globals -%}
+{%- import '_globals.njk' as globals with context -%}
 
 {# Set root domain here to inherit values from config file #}
 {%- set root = utils.conf.homeDomain or utils.conf.domain -%}
