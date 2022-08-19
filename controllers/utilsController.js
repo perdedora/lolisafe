@@ -165,6 +165,12 @@ const statsData = {
     generating: false,
     generatedAt: 0
   },
+  service: {
+    title: 'Service',
+    cache: null,
+    generating: false,
+    generatedAt: 0
+  },
   fileSystems: {
     title: 'File Systems',
     cache: null,
@@ -816,9 +822,49 @@ const generateStats = async (req, res) => {
       data.generating = true
       data.generatedAt = Date.now()
 
+      const cpu = await si.cpu()
       const currentLoad = await si.currentLoad()
       const mem = await si.mem()
       const time = si.time()
+
+      stats[data.title] = {
+        Platform: `${os.platform} ${os.arch}`,
+        Distro: `${os.distro} ${os.release}`,
+        Kernel: os.kernel,
+        CPU: `${cpu.cores} \u00d7 ${cpu.manufacturer} ${cpu.brand} @ ${cpu.speed.toFixed(2)}GHz`,
+        'CPU Load': `${currentLoad.currentLoad.toFixed(1)}%`,
+        'CPUs Load': currentLoad.cpus.map(cpu => `${cpu.load.toFixed(1)}%`).join(', '),
+        Memory: {
+          value: {
+            used: mem.active,
+            total: mem.total
+          },
+          type: 'byteUsage'
+        },
+        Uptime: {
+          value: Math.floor(time.uptime),
+          type: 'uptime'
+        }
+      }
+
+      // Update cache
+      data.cache = stats[data.title]
+      data.generating = false
+    }
+  }
+
+  const getServiceInfo = async () => {
+    const data = statsData.service
+
+    if (!data.cache && data.generating) {
+      stats[data.title] = false
+    } else if (((Date.now() - data.generatedAt) <= 500) || data.generating) {
+      // Use cache for 500 ms (0.5 seconds)
+      stats[data.title] = data.cache
+    } else {
+      data.generating = true
+      data.generatedAt = Date.now()
+
       const nodeUptime = process.uptime()
 
       if (self.scan.instance) {
@@ -831,29 +877,13 @@ const generateStats = async (req, res) => {
       }
 
       stats[data.title] = {
-        Platform: `${os.platform} ${os.arch}`,
-        Distro: `${os.distro} ${os.release}`,
-        Kernel: os.kernel,
+        'Node.js': `${process.versions.node}`,
         Scanner: self.scan.version || 'N/A',
-        'CPU Load': `${currentLoad.currentLoad.toFixed(1)}%`,
-        'CPUs Load': currentLoad.cpus.map(cpu => `${cpu.load.toFixed(1)}%`).join(', '),
-        'System Memory': {
-          value: {
-            used: mem.active,
-            total: mem.total
-          },
-          type: 'byteUsage'
-        },
         'Memory Usage': {
           value: process.memoryUsage().rss,
           type: 'byte'
         },
-        'System Uptime': {
-          value: Math.floor(time.uptime),
-          type: 'uptime'
-        },
-        'Node.js': `${process.versions.node}`,
-        'Service Uptime': {
+        Uptime: {
           value: Math.floor(nodeUptime),
           type: 'uptime'
         }
@@ -1088,6 +1118,7 @@ const generateStats = async (req, res) => {
 
   await Promise.all([
     getSystemInfo(),
+    getServiceInfo(),
     getFileSystems(),
     getUploadsStats(),
     getUsersStats(),
