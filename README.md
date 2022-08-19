@@ -41,40 +41,47 @@ If you want to use an existing lolisafe v3 database with this fork, copy over `d
 
 > **Said migration script is NOT COMPATIBLE with Chibisafe's database.**
 
-Configuration file of lolisafe v3 (`config.js`) is also NOT fully compatible with this fork. There are some options that had been renamed and/or restructured. Please make sure your config matches the sample in `config.sample.js` before starting and/or migrating your previous database.
+Configuration file of lolisafe v3 (`config.js`) is also NOT fully compatible with this fork. There are some options that had been renamed and/or restructured. Please make sure your config matches the sample in `config.sample.js` before starting and/or migrating your previous database (hint: this fork's default config assumes your database file is named `db.sqlite3` instead of `db`).
 
 ## Running in production mode
 
-1. Ensure you have at least Node v14 installed (fully compatible up to Node v16.x LTS, untested with v17 or later).
+1. Ensure you have at least [Node.js](https://nodejs.org/en/download/) v14.x and [Yarn](https://yarnpkg.com/getting-started/install#install-corepack) v1.x installed.
+
+> Fully compatible up to Node.js v16.x LTS (untested with Node.js v17.x or later).  
+> I recommend using [Volta](https://github.com/volta-cli/volta) to ensure you will always have & use the correct Node.js and Yarn versions for lolisafe, even if the requirements change in future updates.  
+>
+> If you want to use this on Docker, please check out the [docker directory](https://github.com/BobbyWibowo/lolisafe/tree/safe.fiery.me/docker) instead.
+
 2. Clone this repo.
 3. Copy `config.sample.js` as `config.js`.
-4. Modify port, domain and privacy options if desired.
-5. Run `yarn install --production` to install all production dependencies (Yes, use [yarn](https://yarnpkg.com)).
-6. Run `yarn start` to start the service.
+4. Modify port, domain, and other options if desired.
+5. Copy `views/_globals.sample.njk` as `views/_globals.njk`.
+6. Modify front-end strings and options if desired.
+7. Run `yarn install --production` to install all production dependencies.
+8. Run `yarn start` to start the service.
 
-> Default admin account:  
+> Default admin/root account:  
 > Username: `root`  
 > Password: `changeme`
 
 You can also start it with `yarn pm2` if you have [PM2](https://pm2.keymetrics.io/).
 
-When running in production mode, the safe will use pre-built client-side CSS/JS files from `dist` directory, while the actual source codes are in `src` directory.
+When running in production mode, lolisafe will use pre-built client-side CSS/JS files from `dist` directory, while the actual source codes are in `src` directory.
 
 The pre-built files are processed with [postcss-preset-env](https://github.com/csstools/postcss-preset-env), [cssnano](https://github.com/cssnano/cssnano), [bublé](https://github.com/bublejs/buble), and [terser](https://github.com/terser/terser), and done automatically with [GitHub Actions](https://github.com/BobbyWibowo/lolisafe/blob/safe.fiery.me/.github/workflows/build.yml).
-
-> If you want to use this on Docker, please check out [docker directory](https://github.com/BobbyWibowo/lolisafe/tree/safe.fiery.me/docker).
 
 ## Running in development mode
 
 This fork has a separate development mode, with which client-side CSS/JS files in `src` directory will be automatically rebuilt using [Gulp](https://github.com/gulpjs/gulp#what-is-gulp) tasks.
 
-1. Follow step 1 to 4 from the production instructions above.
-2. Run `yarn install` to install all dependencies, including development ones.
-3. Run `yarn develop` to start the service in development mode.
+1. Follow steps **1 to 6** from the production instructions above.
+2. Run `yarn install` to install all dependencies (by omitting `--prooduction` option, Yarn will also install development dependencies).
+3. Run `yarn develop` to start lolisafe in development mode.
 
-You can configure the Gulp tasks through `gulpfile.js` file.
+You can further modify the Gulp tasks through `gulpfile.js` file.
 
-During development, the rebuilt files will be saved in `dist-dev` directory instead of `dist` directory. The service will also automatically serve the files from `dist-dev` directory instead. This is to avoid your IDE's Git from unnecessarily rebuilding diff of the modified files.
+During development, the rebuilt files will be saved in `dist-dev` directory instead of `dist` directory. Lolisafe will also automatically serve the files from `dist-dev` directory instead.  
+This is to ensure that your IDE's Git extension will not unnecessarily rebuild diffs of the modified files.
 
 Once you feel like your modifications are ready for production usage, you can then run `yarn build` to build production-ready files that will actually go to `dist` directory.
 
@@ -98,7 +105,7 @@ If you only do some small modifications such as editing `.njk` files and not muc
 
 Still, I heavily recommend simply forking this repository and manually merging upstream changes whenever you feel like doing so. Read more about [syncing a fork](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/syncing-a-fork). Especially if you intend to modify client-side CSS/JS files in `src` directory, since you will then need to rebuild assets that go into `dist` directory, which are guaranteed to always conflict with every updates from this fork that modify them.
 
-Afterwards, you can instead clone your fork into your production server and pull updates from there. You can then choose to only install production dependencies with `yarn install --production` there to save some disk space (hint: this is how I setup safe.fiery.me).
+Afterwards, you can instead clone your fork into your production server and pull updates from there. You can then choose to only install production dependencies with `yarn install --production` there to save some disk space (hint: this is the workflow I use for [https://safe.fiery.me](https://safe.fiery.me)).
 
 ## ClamAV support
 
