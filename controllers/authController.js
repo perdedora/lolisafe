@@ -94,17 +94,22 @@ self.optionalUser = (req, res, next, fields) => {
   // Throws when token if missing only when private is set to true in config,
   // thus use for routes that can handle no auth requests
   const token = req.headers.token
-  if (token) {
-    self.assertUser(token, fields, req.ip)
-      .then(user => {
-        // Add user data to Request.locals.user
-        req.locals.user = user
-        return next()
-      })
-      .catch(next)
-  } else if (config.private === true) {
-    return next(new ClientError('No token provided.', { statusCode: 403 }))
+  if (token === undefined) {
+    if (config.private === true) {
+      return next(new ClientError('No token provided.', { statusCode: 403 }))
+    } else {
+      // Simply bypass this middleware otherwise
+      return next()
+    }
   }
+
+  self.assertUser(token, fields, req.ip)
+    .then(user => {
+      // Add user data to Request.locals.user
+      req.locals.user = user
+      return next()
+    })
+    .catch(next)
 }
 
 self.verify = async (req, res) => {
