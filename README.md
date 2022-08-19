@@ -15,7 +15,7 @@
 * Front-end pages templating with [Nunjucks](https://mozilla.github.io/nunjucks/).
 * A more integrated Cloudflare support (automatically purge files remote cache upon deletion, and more).
 * Chunked uploads to support 100MB+ files when hosted behind Cloudflare, or any other proxies with file upload size limits.
-* Upload remote URLs (have the service download those remote files for you).
+* Upload remote URLs (have lolisafe download those remote files for you).
 * Performant & configurable rate limits powered by [rate-limiter-flexible](https://github.com/animir/node-rate-limiter-flexible).
 * Albums with shareable pretty public pages.
 * User dashboard to manage own uploads and albums.
@@ -26,7 +26,7 @@
 * Strip images EXIF tags if required (can be forced or toggleable by users, and with experimental support for stripping videos tags as well).
 * Various options configurable via header tags upon file uploads (selected file retention period, whether to strip EXIF tags, and more).
 * ShareX support with config file builder in the homepage.
-* Token-based authentication on all APIs, allowing you to easily integrate the service with anything.
+* Token-based authentication on all APIs, allowing you to easily integrate lolisafe with anything.
 * ... and more!
 
 ## Differences with Upstream/Chibisafe
@@ -58,7 +58,7 @@ Configuration file of lolisafe v3 (`config.js`) is also NOT fully compatible wit
 5. Copy `views/_globals.sample.njk` as `views/_globals.njk`.
 6. Modify front-end strings and options if desired.
 7. Run `yarn install --production` to install all production dependencies.
-8. Run `yarn start` to start the service.
+8. Run `yarn start` to start lolisafe.
 
 > Default admin/root account:  
 > Username: `root`  
@@ -75,7 +75,7 @@ The pre-built files are processed with [postcss-preset-env](https://github.com/c
 This fork has a separate development mode, with which client-side CSS/JS files in `src` directory will be automatically rebuilt using [Gulp](https://github.com/gulpjs/gulp#what-is-gulp) tasks.
 
 1. Follow steps **1 to 6** from the production instructions above.
-2. Run `yarn install` to install all dependencies (by omitting `--prooduction` option, Yarn will also install development dependencies).
+2. Run `yarn install` to install all dependencies (by omitting `--production` option, Yarn will also install development dependencies).
 3. Run `yarn develop` to start lolisafe in development mode.
 
 You can further modify the Gulp tasks through `gulpfile.js` file.
