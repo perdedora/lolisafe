@@ -5,11 +5,9 @@ const utils = require('./../controllers/utilsController')
 const config = require('./../config')
 
 routes.get('/nojs', async (req, res) => {
-  // TODO: Update res.render() to allow bypassing cache on demand,
-  // so that this GET route can instead re-use persistent cache
   return res.render('nojs', {
     config, utils, versions: utils.versionStrings
-  })
+  }, !utils.devmode)
 })
 
 // HyperExpress defaults to 250kb
