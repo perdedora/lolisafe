@@ -836,7 +836,9 @@ const generateStats = async (req, res) => {
         'CPU Load': `${currentLoad.currentLoad.toFixed(1)}%`,
         'CPUs Load': currentLoad.cpus.map(cpu => `${cpu.load.toFixed(1)}%`).join(', '),
         'CPU Temperature': {
-          value: cpuTemperature ? cpuTemperature.main : 'Not supported',
+          value: cpuTemperature && typeof cpuTemperature.main === 'number'
+            ? cpuTemperature.main
+            : 'N/A',
           type: 'tempC' // temp value from this library is hard-coded to C
         },
         Memory: {
@@ -847,12 +849,12 @@ const generateStats = async (req, res) => {
           type: 'byteUsage'
         },
         Swap: {
-          value: typeof mem.swapused === 'number' && typeof mem.swaptotal === 'number'
+          value: typeof mem.swaptotal === 'number' && mem.swaptotal > 0
             ? {
                 used: mem.swapused,
                 total: mem.swaptotal
               }
-            : null,
+            : 'N/A',
           type: 'byteUsage'
         },
         Uptime: {
