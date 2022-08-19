@@ -218,6 +218,7 @@ page.preparePage = () => {
 
 page.verifyToken = token => {
   return axios.post('api/tokens/verify', { token }).then(response => {
+    axios.defaults.headers.common.token = token
     localStorage[lsKeys.token] = token
     page.token = token
 
@@ -326,12 +327,7 @@ page.setActiveTab = index => {
 }
 
 page.fetchAlbums = () => {
-  return axios.get('api/albums', {
-    headers: {
-      simple: '1',
-      token: page.token
-    }
-  }).then(response => {
+  return axios.get('api/albums', { headers: { simple: '1' } }).then(response => {
     if (response.data.success === false) {
       return swal('An error occurred!', response.data.description, 'error')
     }
@@ -570,10 +566,9 @@ page.prepareDropzone = () => {
         }]
       }, {
         headers: {
-          token: page.token,
           // Unlike the options above (e.g. albumid, filelength, etc.),
           // strip tags cannot yet be configured per file with this API
-          striptags: page.stripTags
+          striptags: page.stripTags || ''
         }
       }).catch(error => page.formatAxiosError(error)).then(response => {
         file.previewElement.querySelector('.descriptive-progress').classList.add('is-hidden')
@@ -664,10 +659,9 @@ page.processUrlsQueue = () => {
       urls: [file.url]
     }, {
       headers: {
-        token: page.token,
-        albumid: page.album,
-        age: page.uploadAge,
-        filelength: page.fileLength
+        albumid: page.album || '',
+        age: page.uploadAge || '',
+        filelength: page.fileLength || ''
       }
     }).catch(error => page.formatAxiosError(error)).then(response => {
       return finishedUrlUpload(file, response.data)
@@ -794,10 +788,6 @@ page.createAlbum = () => {
       description: document.querySelector('#swalDescription').value.trim(),
       download: document.querySelector('#swalDownload').checked,
       public: document.querySelector('#swalPublic').checked
-    }, {
-      headers: {
-        token: page.token
-      }
     }).then(response => {
       if (response.data.success === false) {
         return swal('An error occurred!', response.data.description, 'error')
