@@ -815,14 +815,15 @@ const generateStats = async (req, res) => {
 
     if (!data.cache && data.generating) {
       stats[data.title] = false
-    } else if (((Date.now() - data.generatedAt) <= 500) || data.generating) {
-      // Use cache for 500 ms (0.5 seconds)
+    } else if (((Date.now() - data.generatedAt) <= 1000) || data.generating) {
+      // Use cache for 1000 ms (1 second)
       stats[data.title] = data.cache
     } else {
       data.generating = true
       data.generatedAt = Date.now()
 
       const cpu = await si.cpu()
+      const cpuTemperature = await si.cpuTemperature()
       const currentLoad = await si.currentLoad()
       const mem = await si.mem()
       const time = si.time()
@@ -834,11 +835,24 @@ const generateStats = async (req, res) => {
         CPU: `${cpu.cores} \u00d7 ${cpu.manufacturer} ${cpu.brand} @ ${cpu.speed.toFixed(2)}GHz`,
         'CPU Load': `${currentLoad.currentLoad.toFixed(1)}%`,
         'CPUs Load': currentLoad.cpus.map(cpu => `${cpu.load.toFixed(1)}%`).join(', '),
+        'CPU Temperature': {
+          value: cpuTemperature ? cpuTemperature.main : 'Not supported',
+          type: 'tempC' // temp value from this library is hard-coded to C
+        },
         Memory: {
           value: {
             used: mem.active,
             total: mem.total
           },
+          type: 'byteUsage'
+        },
+        Swap: {
+          value: typeof mem.swapused === 'number' && typeof mem.swaptotal === 'number'
+            ? {
+                used: mem.swapused,
+                total: mem.swaptotal
+              }
+            : null,
           type: 'byteUsage'
         },
         Uptime: {

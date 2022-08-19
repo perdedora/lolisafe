@@ -3045,13 +3045,23 @@ page.getStatistics = (params = {}) => {
                 parsed = page.getPrettyBytes(value)
                 break
               case 'byteUsage': {
-                // Reasoning: https://github.com/sebhildebrandt/systeminformation/issues/464#issuecomment-756406053
-                const totalForPercentage = typeof value.available !== 'undefined'
-                  ? (value.used + value.available)
-                  : value.total
-                parsed = `${page.getPrettyBytes(value.used)} / ${page.getPrettyBytes(value.total)} (${(value.used / totalForPercentage * 100).toFixed(2)}%)`
+                if (typeof value === 'object') {
+                  // Reasoning: https://github.com/sebhildebrandt/systeminformation/issues/464#issuecomment-756406053
+                  const totalForPercentage = value.available !== undefined
+                    ? (value.used + value.available)
+                    : value.total
+                  parsed = `${page.getPrettyBytes(value.used)} / ${page.getPrettyBytes(value.total)} (${(value.used / totalForPercentage * 100).toFixed(2)}%)`
+                } else {
+                  parsed = value
+                }
                 break
               }
+              case 'tempC':
+                // TODO: Unit conversion when required?
+                parsed = typeof value === 'number'
+                  ? `${value} C`
+                  : value
+                break
               case 'uptime':
                 parsed = page.getPrettyUptime(value)
                 break
