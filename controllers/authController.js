@@ -77,7 +77,7 @@ self.assertUser = async (token, fields, ip) => {
 self.requireUser = (req, res, next, fields) => {
   // Throws when token is missing, thus use only for users-only routes
   const token = req.headers.token
-  if (token === undefined) {
+  if (!token) {
     return next(new ClientError('No token provided.', { statusCode: 403 }))
   }
 
@@ -94,7 +94,7 @@ self.optionalUser = (req, res, next, fields) => {
   // Throws when token if missing only when private is set to true in config,
   // thus use for routes that can handle no auth requests
   const token = req.headers.token
-  if (token === undefined) {
+  if (!token) {
     if (config.private === true) {
       return next(new ClientError('No token provided.', { statusCode: 403 }))
     } else {
