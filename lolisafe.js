@@ -307,7 +307,7 @@ safe.use('/api', api)
     // Git hash
     if (config.showGitHash) {
       utils.gitHash = await new Promise((resolve, reject) => {
-        require('child_process').exec('git rev-parse HEAD', (error, stdout) => {
+        require('child_process').execFile('git', ['rev-parse', 'HEAD'], (error, stdout) => {
           if (error) return reject(error)
           resolve(stdout.replace(/\n$/, ''))
         })
