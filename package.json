@@ -14,11 +14,11 @@
   },
   "license": "MIT",
   "scripts": {
-    "start": "node ./lolisafe.js",
-    "pm2": "pm2 start ./lolisafe.js",
+    "start": "env NODE_ENV=production node ./lolisafe.js",
+    "pm2": "env NODE_ENV=production pm2 start ./lolisafe.js",
     "lint": "gulp lint",
     "build": "gulp default",
-    "watch": "gulp watch",
+    "watch": "env NODE_ENV=production gulp watch",
     "develop": "env NODE_ENV=development gulp watch",
     "dev": "env NODE_ENV=development gulp watch",
     "migrate": "node ./scripts/migrate.js",
@@ -28,7 +28,7 @@
     "delete-expired": "node ./scripts/delete-expired.js",
     "rebuild-hashes": "node ./scripts/rebuild-hashes.js",
     "thumbs": "node ./scripts/thumbs.js",
-    "pull": "git pull && yarn --production",
+    "pull": "git pull && env NODE_ENV=production yarn",
     "stash": "git stash || true",
     "stash-pop": "git stash pop || true",
     "full-upgrade": "rm -f ./yarn.lock && yarn"
