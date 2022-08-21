@@ -9,6 +9,18 @@ process.on('unhandledRejection', error => {
   logger.error(error, { prefix: 'Unhandled Rejection (Promise): ' })
 })
 
+// Change working directory into the directory that contains lolisafe.js
+try {
+  const { chdir, cwd } = require('node:process')
+  if (cwd() !== __dirname) {
+    chdir(__dirname)
+    logger.log(`Changed working directory to: ${__dirname}`)
+  }
+} catch (error) {
+  logger.error(error)
+  process.exit(1)
+}
+
 // Libraries
 const fs = require('fs')
 const helmet = require('helmet')
