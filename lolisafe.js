@@ -191,17 +191,20 @@ if (config.cacheControl) {
   })
 }
 
-// Init ServeStaticQuick middlewares for static assets
+// Init serve static middlewares for static assets
+const ServeStaticClass = utils.conf.disableServeStaticQuick
+  ? ServeLiveDirectory
+  : ServeStaticQuick
 // Static assets in /dist directory
-const serveStaticQuickDistInstance = new ServeStaticQuick(paths.dist, {
+const serveStaticDistInstance = new ServeStaticClass(paths.dist, {
   setHeaders: setHeadersForStaticAssets
 })
-safe.use(serveStaticQuickDistInstance.middleware)
+safe.use(serveStaticDistInstance.middleware)
 // Static assets in /public directory
-const serveStaticQuickPublicInstance = new ServeStaticQuick(paths.public, {
+const serveStaticPublicInstance = new ServeStaticClass(paths.public, {
   setHeaders: setHeadersForStaticAssets
 })
-safe.use(serveStaticQuickPublicInstance.middleware)
+safe.use(serveStaticPublicInstance.middleware)
 
 // Routes
 safe.use(album)
@@ -313,8 +316,8 @@ safe.use('/api', api)
 
     // Await all ServeLiveDirectory and ServeStaticQuick instances
     await Promise.all([
-      serveStaticQuickDistInstance.ready(),
-      serveStaticQuickPublicInstance.ready(),
+      serveStaticDistInstance.ready(),
+      serveStaticPublicInstance.ready(),
       serveLiveDirectoryCustomPagesInstance.ready()
     ])
 

@@ -22,7 +22,8 @@ const self = {
     // Allow some config options to be overriden via env vars
     port: process.env.PORT || config.port,
     domain: process.env.DOMAIN || config.domain,
-    homeDomain: process.env.HOME_DOMAIN || config.homeDomain
+    homeDomain: process.env.HOME_DOMAIN || config.homeDomain,
+    disableServeStaticQuick: process.env.SERVE_STATIC_QUICK === '0'
   },
   scan: {
     instance: null,
