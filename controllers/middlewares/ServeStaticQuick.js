@@ -77,9 +77,17 @@ class ServeStaticQuick {
     this.#options = options
   }
 
-  handler (req, res, stat) {
+  get (path) {
+    const stat = this.files.get(path)
+
+    if (!stat || stat.isDirectory()) return
+
+    return stat
+  }
+
+  handler (req, res, path, stat) {
     // Set Content-Type
-    res.type(req.path)
+    res.type(path)
 
     // Set header fields
     this.#setHeaders(req, res, stat)
@@ -106,7 +114,7 @@ class ServeStaticQuick {
       res.end()
     }
 
-    return this.#stream(req, res, stat, result)
+    return this.#stream(req, res, path, stat, result)
   }
 
   // Returns a promise which resolves to true once ServeStaticQuick is ready
@@ -154,26 +162,30 @@ class ServeStaticQuick {
     })
   }
 
-  #get (path) {
-    const stat = this.files.get(path)
-
-    if (!stat || stat.isDirectory()) return
-
-    return stat
-  }
-
   #middleware (req, res, next) {
     // Only process GET and HEAD requests
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return next()
     }
 
-    const stat = this.#get(req.path)
+    // If root path is set, ensure it matches the request
+    let path = req.path
+    if (this.#options.root) {
+      if (path.indexOf(this.#options.root) === 0) {
+        // Re-map path for internal .get()
+        path = path.replace(this.#options.root, '')
+      } else {
+        // Immediately proceed to next middleware otherwise
+        return next()
+      }
+    }
+
+    const stat = this.get(path)
     if (stat === undefined) {
       return next()
     }
 
-    return this.handler(req, res, stat)
+    return this.handler(req, res, path, stat)
   }
 
   #setHeaders (req, res, stat) {
@@ -198,8 +210,8 @@ class ServeStaticQuick {
     }
   }
 
-  #stream (req, res, stat, result) {
-    const fullPath = this.directory + req.path
+  #stream (req, res, path, stat, result) {
+    const fullPath = this.directory + path
     const readStream = fs.createReadStream(fullPath, result.options)
 
     readStream.on('error', error => {

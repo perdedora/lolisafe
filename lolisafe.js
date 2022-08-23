@@ -268,9 +268,9 @@ safe.use('/api', api)
     safe.use((req, res, next) => {
       if (req.method === 'GET' || req.method === 'HEAD') {
         const page = req.path === '/' ? 'home' : req.path.substring(1)
-        const customPage = serveLiveDirectoryCustomPagesInstance.instance.get(`${page}.html`)
+        const customPage = serveLiveDirectoryCustomPagesInstance.get(`${page}.html`)
         if (customPage) {
-          return serveLiveDirectoryCustomPagesInstance.handler(req, res, customPage)
+          return serveLiveDirectoryCustomPagesInstance.handler(req, res, req.path, customPage)
         } else if (config.pages.includes(page)) {
           // These rendered pages are persistently cached during production
           return res.render(page, {
