@@ -567,7 +567,12 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
     // Try to determine size early via Content-Length header,
     // but continue anyway if it isn't a valid number
     try {
-      const head = await fetch(url, { method: 'HEAD', size: urlMaxSizeBytes })
+      const head = await fetch(url, {
+        method: 'HEAD',
+        size: urlMaxSizeBytes, // limit max response body size
+        timeout: 10 * 1000 // 10 seconds
+      })
+
       if (head.status === 200) {
         const contentLength = parseInt(head.headers.get('content-length'))
         if (!Number.isNaN(contentLength)) {
@@ -595,8 +600,11 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
       writeStream = fs.createWriteStream(file.path)
       hashStream = enableHashing && blake3.createHash()
 
-      // Limit max response body size with maximum allowed size
-      const fetchFile = await fetch(url, { method: 'GET', size: urlMaxSizeBytes })
+      const fetchFile = await fetch(url, {
+        method: 'GET',
+        size: urlMaxSizeBytes, // limit max response body size
+        timeout: 10 * 1000 // 10 seconds
+      })
         .then(res => new Promise((resolve, reject) => {
           if (res.status !== 200) {
             return resolve(res)
@@ -696,6 +704,7 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
     // Re-throw suppressed errors as ClientError, otherwise as-is
     const errorString = error.toString()
     const suppress = [
+      / network timeout at:/,
       / over limit:/
     ]
     if (suppress.some(t => t.test(errorString))) {
