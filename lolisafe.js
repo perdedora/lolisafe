@@ -11,7 +11,7 @@ process.on('unhandledRejection', error => {
 
 // Change working directory into the directory that contains lolisafe.js
 try {
-  const { chdir, cwd } = require('node:process')
+  const { chdir, cwd } = require('process')
   if (cwd() !== __dirname) {
     chdir(__dirname)
     logger.log(`Changed working directory to: ${__dirname}`)
