@@ -355,6 +355,10 @@ self.editUser = async (req, res) => {
     update.password = await bcrypt.hash(password, saltRounds)
   }
 
+  if (!Object.keys(update).length) {
+    throw new ClientError('You are not editing any properties of this user.')
+  }
+
   await utils.db.table('users')
     .where('id', id)
     .update(update)
