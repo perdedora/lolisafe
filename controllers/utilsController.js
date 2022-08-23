@@ -91,7 +91,7 @@ self.md.instance.renderer.rules.link_open = function (tokens, idx, options, env,
 }
 
 if (typeof config.uploads.retentionPeriods === 'object' &&
-Object.keys(config.uploads.retentionPeriods).length) {
+  Object.keys(config.uploads.retentionPeriods).length) {
   // Build a temporary index of group values
   const _retentionPeriods = Object.assign({}, config.uploads.retentionPeriods)
   const _groups = { _: -1 }
@@ -146,7 +146,7 @@ Object.keys(config.uploads.retentionPeriods).length) {
     }
   }
 } else if (Array.isArray(config.uploads.temporaryUploadAges) &&
-config.uploads.temporaryUploadAges.length) {
+  config.uploads.temporaryUploadAges.length) {
   self.retentions.periods._ = config.uploads.temporaryUploadAges
     .filter((v, i, a) => Number.isFinite(v) && v >= 0)
   self.retentions.default._ = self.retentions.periods._[0]
