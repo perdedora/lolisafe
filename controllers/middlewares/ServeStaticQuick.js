@@ -54,6 +54,11 @@ class ServeStaticQuick {
       options.etag = true
     }
 
+    if (options.ignore && typeof options.ignore !== 'function') {
+      // Unlike LiveDirectory, we only support function for simplicity's sake
+      throw new TypeError('Middleware option ignore must be a function')
+    }
+
     if (options.lastModified === undefined) {
       options.lastModified = true
     }
@@ -140,7 +145,10 @@ class ServeStaticQuick {
         case 'add':
         case 'addDir':
         case 'change':
-          this.files.set(relPath, stat)
+          // Ensure relative path does not pass ignore function if set
+          if (!this.#options.ignore || !this.#options.ignore(relPath, stat)) {
+            this.files.set(relPath, stat)
+          }
           break
         case 'unlink':
         case 'unlinkDir':
