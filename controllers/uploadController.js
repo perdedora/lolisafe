@@ -338,6 +338,10 @@ self.actuallyUpload = async (req, res, data = {}) => {
 
     // Process files immediately and push into Request.files array
     if (field.file) {
+      if (field.name !== 'files[]') {
+        throw new ClientError(`Unexpected file-type field: ${field.name}`)
+      }
+
       // Push immediately as we will only be adding props into the file object down the line
       const file = {
         albumid: data.albumid,
