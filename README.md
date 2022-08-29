@@ -39,14 +39,18 @@ Chibisafe is an upstream rewrite & rebrand, and technically is lolisafe v4.
 
 If you want to use an existing lolisafe v3 database with this fork, copy over `database/db` file from your previous installation, then run `yarn migrate` at least once to create the new database columns introduced in this fork (don't forget to make a backup).
 
-> **Said migration script is NOT COMPATIBLE with Chibisafe's database.**
+> **Warning**  
+> The migration script is **NOT COMPATIBLE** with Chibisafe's database.
 
-Configuration file of lolisafe v3 (`config.js`) is also NOT fully compatible with this fork. There are some options that had been renamed and/or restructured. Please make sure your config matches the sample in `config.sample.js` before starting and/or migrating your previous database (hint: this fork's default config assumes your database file is named `db.sqlite3` instead of `db`).
+Configuration file of lolisafe v3 (`config.js`) is also NOT fully compatible with this fork. There are some options that had been renamed and/or restructured
+
+Please make sure your config matches the sample in `config.sample.js` before starting and/or migrating your previous database (hint: this fork's default config assumes your database file is named `db.sqlite3` instead of `db`).
 
 ## Running in production mode
 
 1. Ensure you have at least [Node.js](https://nodejs.org/en/download/) v14.x and [Yarn](https://yarnpkg.com/getting-started/install#install-corepack) v1.x installed.
 
+> **Note**  
 > Fully compatible up to Node.js v16.x LTS (untested with Node.js v17.x or later).  
 > I recommend using [Volta](https://github.com/volta-cli/volta) to ensure you will always have & use the correct Node.js and Yarn versions for lolisafe, even if the requirements change in future updates.  
 >
@@ -60,6 +64,7 @@ Configuration file of lolisafe v3 (`config.js`) is also NOT fully compatible wit
 7. Run `yarn install --production` to install all production dependencies.
 8. Run `yarn start` to start lolisafe.
 
+> **Note**  
 > Default admin/root account:  
 > Username: `root`  
 > Password: `changeme`
@@ -85,6 +90,7 @@ This is to ensure that your IDE's Git extension will not unnecessarily rebuild d
 
 Once you feel like your modifications are ready for production usage, you can then run `yarn build` to build production-ready files that will actually go to `dist` directory.
 
+> **Note**  
 > If you are submitting a Pull Request, please do not stage any changes to files in `dist` directory.  
 > GitHub Actions will automatically rebuild those assets if and when required.
 
@@ -115,6 +121,6 @@ It will scan new files right after they are uploaded, then alert the uploaders o
 
 Unfortunately, this will slow down uploads processing as it has to wait for the scans before responding the uploaders. However, it's still highly recommended for public usage, or if you're like me who find the constant buzzing from Google Safe Search too annoying.
 
-To enable this, make sure you have [ClamAV installed](https://github.com/kylefarris/clamscan#to-use-local-binary-method-of-scanning), or additionally have [ClamAV daemon running](https://github.com/kylefarris/clamscan#to-use-clamav-using-tcp-sockets) (using daemon is considerably faster). Afterwards configure `uploads.scan` options, and more importantly its sub-option `clamOptions`. Read more about it in the `config.sample.js` file.
+To enable this, make sure you have [ClamAV installed](https://github.com/kylefarris/clamscan#to-use-local-binary-method-of-scanning), or additionally have [ClamAV daemon running](https://github.com/kylefarris/clamscan#to-use-clamav-using-tcp-sockets) (using daemon is considerably faster). Afterwards, configure `uploads.scan` options, and more importantly its sub-option `clamOptions`. Read more about them in `config.sample.js`.
 
 Additionally, you can also configure usergroups bypass, extensions whitelist, and max file size, to lessen the burden on your server.
