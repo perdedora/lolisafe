@@ -613,6 +613,11 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
       // Reduce GET timeout by time already spent for HEAD request
       const _timeout = urlFetchTimeout - (Date.now() - headStart)
 
+      // Skip early if HEAD fetch took too long
+      if (_timeout <= 0) {
+        throw new ClientError('Fetch timed out. Try again?')
+      }
+
       const fetchFile = await utils.fetch(url, {
         method: 'GET',
         size: urlMaxSizeBytes, // limit max response body size
