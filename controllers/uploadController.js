@@ -1,6 +1,5 @@
 const blake3 = require('blake3')
 const contentDisposition = require('content-disposition')
-const fetch = require('node-fetch')
 const fs = require('fs')
 const path = require('path')
 const randomstring = require('randomstring')
@@ -31,12 +30,22 @@ const fileIdentifierLengthChangeable = !config.uploads.fileIdentifierLength.forc
   typeof config.uploads.fileIdentifierLength.min === 'number' &&
   typeof config.uploads.fileIdentifierLength.max === 'number'
 
+// Regular file uploads
 const maxSize = parseInt(config.uploads.maxSize)
 const maxSizeBytes = maxSize * 1e6
+
+// URL uploads
 const urlMaxSize = parseInt(config.uploads.urlMaxSize)
 const urlMaxSizeBytes = urlMaxSize * 1e6
 
+// Max files allowed in a single multiform POST request
 const maxFilesPerUpload = 20
+
+// URL uploads timeout for fetch() instances
+// Please be aware that uWebSockets.js has a hard-coded timeout of 10s of no activity,
+// so letting fetch() run for more than 10s may cause connection to uploaders to drop early,
+// thus preventing lolisafe from responding to uploaders about their URL uploads.
+const urlFetchTimeout = 10 * 1000 // 10 seconds
 
 const chunkedUploads = config.uploads.chunkSize &&
   typeof config.uploads.chunkSize === 'object' &&
@@ -565,12 +574,13 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
     }
 
     // Try to determine size early via Content-Length header,
-    // but continue anyway if it isn't a valid number
+    // but continue anyway if it isn't a valid number (some servers don't provide them)
+    const headStart = Date.now()
     try {
-      const head = await fetch(url, {
+      const head = await utils.fetch(url, {
         method: 'HEAD',
         size: urlMaxSizeBytes, // limit max response body size
-        timeout: 10 * 1000 // 10 seconds
+        timeout: urlFetchTimeout
       })
 
       if (head.status === 200) {
@@ -600,10 +610,13 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
       writeStream = fs.createWriteStream(file.path)
       hashStream = enableHashing && blake3.createHash()
 
-      const fetchFile = await fetch(url, {
+      // Reduce GET timeout by time already spent for HEAD request
+      const _timeout = urlFetchTimeout - (Date.now() - headStart)
+
+      const fetchFile = await utils.fetch(url, {
         method: 'GET',
         size: urlMaxSizeBytes, // limit max response body size
-        timeout: 10 * 1000 // 10 seconds
+        timeout: _timeout
       })
         .then(res => new Promise((resolve, reject) => {
           if (res.status !== 200) {
@@ -709,6 +722,8 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
     ]
     if (suppress.some(t => t.test(errorString))) {
       throw new ClientError(errorString)
+    } else if (errorString.startsWith('AbortError:')) {
+      throw new ClientError('Fetch timed out. Try again?')
     } else {
       throw error
     }

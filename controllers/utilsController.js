@@ -1,4 +1,5 @@
 const { promisify } = require('util')
+const AbortController = require('abort-controller')
 const fastq = require('fastq')
 const fetch = require('node-fetch')
 const ffmpeg = require('fluent-ffmpeg')
@@ -196,6 +197,32 @@ const statsData = {
     generating: false,
     generatedAt: 0
   }
+}
+
+// This helper function initiates fetch() with AbortController
+// signal controller to handle per-instance global timeout.
+// node-fetch's built-in timeout option resets on every redirect,
+// and thus not reliable in certain cases.
+self.fetch = (url, options = {}) => {
+  if (options.timeout === undefined) {
+    return fetch(url, options)
+  }
+
+  // Init AbortController
+  const abortController = new AbortController()
+  const timeout = setTimeout(() => {
+    abortController.abort()
+  }, options.timeout)
+
+  // Clean up options object
+  options.signal = abortController.signal
+  delete options.timeout
+
+  // Return instance with an attached Promise.finally() handler to clear timeout
+  return fetch(url, options)
+    .finally(() => {
+      clearTimeout(timeout)
+    })
 }
 
 const cloudflareAuth = config.cloudflare && config.cloudflare.zoneId &&
