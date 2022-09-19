@@ -47,7 +47,7 @@ routes.get('/a/:identifier', async (req, res) => {
   }
 
   const files = await utils.db.table('files')
-    .select('name', 'size')
+    .select('name', 'size', 'timestamp')
     .where('albumid', album.id)
     .orderBy('id', 'desc')
 
