@@ -105,6 +105,25 @@ module.exports = {
   cookiePolicy: false,
 
   /*
+    Additional routes that come with their own frontend pages logic (in routes/routeName.js).
+    These routes will always be enabled by default, even if the option below is missing,
+    so they need to be explicitly set to false to disable.
+
+    NOTE: Some frontend scripts in dashboard, etc., will always assume that they are all enabled,
+    so they may end up with dead links if disabled (i.e. file info button in dashboard),
+    but otherwise their other own main functions should remain working.
+
+    In short, this is mainly intended for those who know what they are doing,
+    and are willing to modify the scripts themselves when required.
+  */
+  routes: {
+    album: true,
+    file: true,
+    nojs: true,
+    player: true
+  },
+
+  /*
     This can be either 'blacklist' or 'whitelist', which should be self-explanatory.
     When this is set to neither, this will fallback to 'blacklist'.
   */

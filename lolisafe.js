@@ -219,10 +219,17 @@ const serveStaticPublicInstance = new ServeStaticClass(paths.public, {
 safe.use(serveStaticPublicInstance.middleware)
 
 // Routes
-safe.use(album)
-safe.use(file)
-safe.use(nojs)
-safe.use(player)
+config.routes = typeof config.routes === 'object'
+  ? config.routes
+  : {}
+
+// Only disable these routes if they are explicitly set to false in config file
+if (config.routes.album !== false) safe.use(album)
+if (config.routes.file !== false) safe.use(file)
+if (config.routes.nojs !== false) safe.use(nojs)
+if (config.routes.player !== false) safe.use(player)
+
+// API routes
 safe.use('/api', api)
 
 ;(async () => {
