@@ -83,7 +83,7 @@ class ServeStatic {
       }
 
       if (this.contentTypesMaps.size) {
-        logger.debug(`Inititated Content-Type overrides map for ${this.contentTypesMaps.size} extension(s).`)
+        logger.debug(`Initiated Content-Type overrides map for ${this.contentTypesMaps.size} extension(s).`)
       } else {
         this.contentTypesMaps = undefined
       }
@@ -98,7 +98,7 @@ class ServeStatic {
         }
       )
 
-      logger.debug('Inititated SimpleDataStore for Content-Disposition: ' +
+      logger.debug('Initiated SimpleDataStore for Content-Disposition: ' +
          `{ limit: ${this.contentDispositionStore.limit}, strategy: "${this.contentDispositionStore.strategy}" }`)
     }
 
