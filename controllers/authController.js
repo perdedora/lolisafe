@@ -74,14 +74,14 @@ self.assertUser = async (token, fields, ip) => {
   }
 }
 
-self.requireUser = (req, res, next, fields) => {
+self.requireUser = (req, res, next, options = {}) => {
   // Throws when token is missing, thus use only for users-only routes
-  const token = req.headers.token
+  const token = options.token || req.headers.token
   if (!token) {
     return next(new ClientError('No token provided.', { statusCode: 403 }))
   }
 
-  self.assertUser(token, fields, req.ip)
+  self.assertUser(token, options.fields, req.ip)
     .then(user => {
       // Add user data to Request.locals.user
       req.locals.user = user
@@ -90,10 +90,10 @@ self.requireUser = (req, res, next, fields) => {
     .catch(next)
 }
 
-self.optionalUser = (req, res, next, fields) => {
+self.optionalUser = (req, res, next, options = {}) => {
   // Throws when token if missing only when private is set to true in config,
   // thus use for routes that can handle no auth requests
-  const token = req.headers.token
+  const token = options.token || req.headers.token
   if (!token) {
     if (config.private === true) {
       return next(new ClientError('No token provided.', { statusCode: 403 }))
@@ -103,7 +103,7 @@ self.optionalUser = (req, res, next, fields) => {
     }
   }
 
-  self.assertUser(token, fields, req.ip)
+  self.assertUser(token, options.fields, req.ip)
     .then(user => {
       // Add user data to Request.locals.user
       req.locals.user = user

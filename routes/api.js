@@ -44,10 +44,15 @@ routes.post('/users/edit', [auth.requireUser, utils.assertJSON], auth.editUser)
 /** ./controllers/uploadController.js */
 
 // HyperExpress defaults to 250kb
-// https://github.com/kartikk221/hyper-express/blob/6.4.4/docs/Server.md#server-constructor-options
-const maxBodyLength = parseInt(config.uploads.maxSize) * 1e6
-routes.post('/upload', { max_body_length: maxBodyLength }, auth.optionalUser, upload.upload)
-routes.post('/upload/:albumid', { max_body_length: maxBodyLength }, auth.optionalUser, upload.upload)
+// https://github.com/kartikk221/hyper-express/blob/6.4.8/docs/Server.md#server-constructor-options
+const uploadOptions = {
+  max_body_length: parseInt(config.uploads.maxSize) * 1e6,
+  middlewares: [
+    auth.optionalUser
+  ]
+}
+routes.post('/upload', uploadOptions, upload.upload)
+routes.post('/upload/:albumid', uploadOptions, upload.upload)
 routes.post('/upload/finishchunks', [auth.optionalUser, utils.assertJSON], upload.finishChunks)
 
 routes.get('/uploads', auth.requireUser, upload.list)
@@ -78,8 +83,10 @@ routes.post('/albums/rename', [auth.requireUser, utils.assertJSON], albums.renam
 
 routes.get('/tokens', auth.requireUser, tokens.list)
 routes.post('/tokens/change', (req, res, next) => {
-  // Include user's "token" field into database query
-  auth.requireUser(req, res, next, 'token')
+  auth.requireUser(req, res, next, {
+    // Include user's "token" field into database query
+    fields: ['token']
+  })
 }, tokens.change)
 routes.post('/tokens/verify', utils.assertJSON, tokens.verify)
 
