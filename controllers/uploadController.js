@@ -4,6 +4,7 @@ const fs = require('fs')
 const path = require('path')
 const randomstring = require('randomstring')
 const searchQuery = require('search-query-parser')
+const auth = require('./authController')
 const paths = require('./pathsController')
 const perms = require('./permissionController')
 const utils = require('./utilsController')
@@ -263,12 +264,16 @@ self.parseStripTags = stripTags => {
 /** File uploads */
 
 self.upload = async (req, res) => {
-  // Assert Request type
-  // Multipart for regular uploads, JSON for URL uploads
-  const isMultipart = req.is('multipart/form-data')
-  const isJson = req.is('application/json')
-  if (!isMultipart && !isJson) {
-    throw new ClientError('Request Content-Type must be either multipart/form-data or application/json.')
+  // Assert Request type (skip for POST /nojs requests)
+  let isMultipart = req.locals.nojs
+  let isJson
+  if (!req.locals.nojs) {
+    // Multipart for regular uploads, JSON for URL uploads
+    isMultipart = req.is('multipart/form-data')
+    isJson = req.is('application/json')
+    if (!isMultipart && !isJson) {
+      throw new ClientError('Request Content-Type must be either multipart/form-data or application/json.')
+    }
   }
 
   if (config.privateUploadGroup) {
@@ -511,6 +516,18 @@ self.actuallyUpload = async (req, res, data = {}) => {
       file.chunksData.processing = false
     })
     return res.json({ success: true })
+  }
+
+  // If POST /nojs requests, additionally attempt to parse token from form input
+  if (req.locals.nojs) {
+    await new Promise((resolve, reject) => {
+      auth.optionalUser(req, res, error => {
+        if (error) return reject(error)
+        return resolve()
+      }, {
+        token: req.body.token
+      })
+    })
   }
 
   const filesData = req.files
