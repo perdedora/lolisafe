@@ -55,6 +55,7 @@ paths.initSync()
 const utils = require('./controllers/utilsController')
 
 // Middlewares
+const DebugLogging = require('./controllers/middlewares/DebugLogging')
 const ExpressCompat = require('./controllers/middlewares/ExpressCompat')
 const NunjucksRenderer = require('./controllers/middlewares/NunjucksRenderer')
 const RateLimiter = require('./controllers/middlewares/RateLimiter')
@@ -70,6 +71,12 @@ const api = require('./routes/api')
 const file = require('./routes/file')
 const nojs = require('./routes/nojs')
 const player = require('./routes/player')
+
+// Incoming requests logging (development mode)
+if (utils.devmode) {
+  const DebugLoggingInstance = new DebugLogging()
+  safe.use(DebugLoggingInstance.middleware)
+}
 
 // Express-compat
 const expressCompatInstance = new ExpressCompat()
