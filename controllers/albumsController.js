@@ -73,6 +73,10 @@ self.getUniqueAlbumIdentifier = async res => {
       continue
     }
 
+    if (utils.devmode) {
+      logger.debug(`albums.onHold: ${utils.inspect(self.onHold)}`)
+    }
+
     // Unhold identifier once the Response has been sent
     if (res) {
       // Keep in an array for future-proofing
@@ -95,7 +99,10 @@ self.unholdAlbumIdentifiers = res => {
 
   for (const identifier of res.locals.identifiers) {
     self.onHold.delete(identifier)
-    logger.debug(`Unheld identifier ${identifier}.`)
+
+    if (utils.devmode) {
+      logger.debug(`albums.onHold: ${utils.inspect(self.onHold)} -> ${utils.inspect(identifier)}`)
+    }
   }
 
   delete res.locals.identifiers
