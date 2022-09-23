@@ -187,6 +187,10 @@ self.getUniqueUploadIdentifier = async (length, extension = '', res) => {
         continue
       }
 
+      if (utils.devmode) {
+        logger.debug(`upload.onHold: ${utils.inspect(self.onHold)}`)
+      }
+
       // Unhold identifier once the Response has been sent
       if (res) {
         if (!res.locals.identifiers) {
@@ -220,7 +224,10 @@ self.unholdUploadIdentifiers = res => {
 
   for (const identifier of res.locals.identifiers) {
     self.onHold.delete(identifier)
-    logger.debug(`Unheld identifier ${identifier}.`)
+
+    if (utils.devmode) {
+      logger.debug(`upload.onHold: ${utils.inspect(self.onHold)} -> ${utils.inspect(identifier)}`)
+    }
   }
 
   delete res.locals.identifiers

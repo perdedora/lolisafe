@@ -16,8 +16,12 @@ const SimpleDataStore = require('./utils/SimpleDataStore')
 const config = require('./../config')
 const logger = require('./../logger')
 
+const devmode = process.env.NODE_ENV === 'development'
+
 const self = {
-  devmode: process.env.NODE_ENV === 'development',
+  devmode,
+  inspect: devmode && require('util').inspect,
+
   db: knex(config.database),
   conf: {
     // Allow some config options to be overriden via env vars
