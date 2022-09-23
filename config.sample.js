@@ -594,7 +594,10 @@ module.exports = {
       video: true,
       // Placeholder defaults to 'public/images/unavailable.png'.
       placeholder: null,
-      size: 200
+      size: 200,
+      // https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/tree/v2.1.2#screenshotsoptions-dirname-generate-thumbnails
+      // Only accepts a single value. Defaults to 20%.
+      videoTimemark: '20%'
     },
 
     /*

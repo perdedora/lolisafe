@@ -524,7 +524,9 @@ self.generateThumbs = async (name, extname, force) => {
           .screenshots({
             folder: paths.thumbs,
             filename: name.slice(0, -extname.length) + '.png',
-            timestamps: ['20%'],
+            timemarks: [
+              config.uploads.generateThumbs.videoTimemark || '20%'
+            ],
             size: videoStream.width >= videoStream.height
               ? `${self.thumbsSize}x?`
               : `?x${self.thumbsSize}`
