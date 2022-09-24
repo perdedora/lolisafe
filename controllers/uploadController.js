@@ -1389,28 +1389,27 @@ self.list = async (req, res) => {
     }
 
     const parseDate = (date, minoffset, resetMs) => {
+      let offset = 0
+      if (minoffset !== undefined) {
+        offset = 60000 * (utils.timezoneOffset - minoffset)
+      }
+
       // [YYYY][/MM][/DD] [HH][:MM][:SS]
       // e.g. 2020/01/01 00:00:00, 2018/01/01 06, 2019/11, 12:34:00
-      const match = date.match(/^(\d{4})?(\/\d{2})?(\/\d{2})?\s?(\d{2})?(:\d{2})?(:\d{2})?$/)
-
-      if (match) {
-        let offset = 0
-        if (minoffset !== undefined) {
-          offset = 60000 * (utils.timezoneOffset - minoffset)
-        }
-
+      const formattedMatch = date.match(/^(\d{4})?(\/\d{2})?(\/\d{2})?\s?(\d{2})?(:\d{2})?(:\d{2})?$/)
+      if (formattedMatch) {
         const dateObj = new Date(Date.now() + offset)
 
-        if (match[1] !== undefined) {
-          dateObj.setFullYear(Number(match[1]), // full year
-            match[2] !== undefined ? (Number(match[2].slice(1)) - 1) : 0, // month, zero-based
-            match[3] !== undefined ? Number(match[3].slice(1)) : 1) // date
+        if (formattedMatch[1] !== undefined) {
+          dateObj.setFullYear(Number(formattedMatch[1]), // full year
+            formattedMatch[2] !== undefined ? (Number(formattedMatch[2].slice(1)) - 1) : 0, // month, zero-based
+            formattedMatch[3] !== undefined ? Number(formattedMatch[3].slice(1)) : 1) // date
         }
 
-        if (match[4] !== undefined) {
-          dateObj.setHours(Number(match[4]), // hours
-            match[5] !== undefined ? Number(match[5].slice(1)) : 0, // minutes
-            match[6] !== undefined ? Number(match[6].slice(1)) : 0) // seconds
+        if (formattedMatch[4] !== undefined) {
+          dateObj.setHours(Number(formattedMatch[4]), // hours
+            formattedMatch[5] !== undefined ? Number(formattedMatch[5].slice(1)) : 0, // minutes
+            formattedMatch[6] !== undefined ? Number(formattedMatch[6].slice(1)) : 0) // seconds
         }
 
         if (resetMs) {
@@ -1419,6 +1418,9 @@ self.list = async (req, res) => {
 
         // Calculate timezone differences
         return new Date(dateObj.getTime() - offset)
+      } else if (/^\d+/.test(date)) {
+        // Unix timestamps (always assume seconds resolution)
+        return new Date(parseInt(date) * 1000)
       } else {
         return null
       }

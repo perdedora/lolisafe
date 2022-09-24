@@ -1163,8 +1163,9 @@ page.uploadFiltersHelp = element => {
     Negation sign can also be used to exclude the special case mentioned above (i.e. <code>-albumid:-</code>).`}
 
     There are 2 range keys: <b>date</b> (upload date) and <b>expiry</b> (expiry date).
-    Their format is: <code>"YYYY/MM/DD HH:MM:SS-YYYY/MM/DD HH:MM:SS"</code> ("from" date and "to" date respectively).
-    You may specify only one of the dates.
+    Their format is: <code>"YYYY/MM/DD HH:MM:SS-YYYY/MM/DD HH:MM:SS"</code> ("from" date and "to" date respectively),
+    OR unix timestamps in seconds resolution.
+    You may choose to specify only either dates.
     If "to" date is missing, 'now' will be used. If "from" date is missing, 'beginning of time' will be used.
     If any of the subsequent date or time units are not specified, their first value will be used (e.g. January for month, 1 for day, and so on).
     If only time is specified, today's date will be used.
