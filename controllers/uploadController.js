@@ -1,6 +1,7 @@
 const blake3 = require('blake3')
 const contentDisposition = require('content-disposition')
 const fs = require('fs')
+const parseDuration = require('parse-duration')
 const path = require('path')
 const randomstring = require('randomstring')
 const searchQuery = require('search-query-parser')
@@ -1219,6 +1220,12 @@ self.list = async (req, res) => {
   const MAX_SORT_KEYS = 2
   const MAX_IS_KEYS = 1
 
+  // Timezone offset
+  let timezoneOffset = 0
+  if (minoffset !== undefined) {
+    timezoneOffset = 60000 * (utils.timezoneOffset - minoffset)
+  }
+
   const filterObj = {
     uploaders: [],
     excludeUploaders: [],
@@ -1388,17 +1395,12 @@ self.list = async (req, res) => {
       }
     }
 
-    const parseDate = (date, minoffset, resetMs) => {
-      let offset = 0
-      if (minoffset !== undefined) {
-        offset = 60000 * (utils.timezoneOffset - minoffset)
-      }
-
+    const parseDate = (date, resetMs) => {
       // [YYYY][/MM][/DD] [HH][:MM][:SS]
       // e.g. 2020/01/01 00:00:00, 2018/01/01 06, 2019/11, 12:34:00
       const formattedMatch = date.match(/^(\d{4})?(\/\d{2})?(\/\d{2})?\s?(\d{2})?(:\d{2})?(:\d{2})?$/)
       if (formattedMatch) {
-        const dateObj = new Date(Date.now() + offset)
+        const dateObj = new Date(Date.now() + timezoneOffset)
 
         if (formattedMatch[1] !== undefined) {
           dateObj.setFullYear(Number(formattedMatch[1]), // full year
@@ -1417,24 +1419,58 @@ self.list = async (req, res) => {
         }
 
         // Calculate timezone differences
-        return new Date(dateObj.getTime() - offset)
-      } else if (/^\d+/.test(date)) {
+        return new Date(dateObj.getTime() - timezoneOffset)
+      } else if (/^\d+$/.test(date)) {
         // Unix timestamps (always assume seconds resolution)
         return new Date(parseInt(date) * 1000)
-      } else {
+      }
+      return null
+    }
+
+    const parseRelativeDuration = (operator, duration, resetMs, inverse = false) => {
+      let milliseconds = parseDuration(duration)
+      if (isNaN(milliseconds) || typeof milliseconds !== 'number') {
         return null
       }
+
+      let from = operator === '<'
+      if (inverse) {
+        // Intended for "expiry" column, as it essentially has to do the opposite
+        from = !from
+        milliseconds = -milliseconds
+      }
+
+      const dateObj = new Date(Date.now() + timezoneOffset - milliseconds)
+      if (resetMs) {
+        dateObj.setMilliseconds(0)
+      }
+
+      const range = { from: null, to: null }
+      const offsetDateObj = new Date(dateObj.getTime() - timezoneOffset)
+      if (from) {
+        range.from = Math.floor(offsetDateObj / 1000)
+      } else {
+        range.to = Math.ceil(offsetDateObj / 1000)
+      }
+      return range
     }
 
     // Parse dates to timestamps
     for (const range of ranges) {
       if (filterObj.queries[range]) {
         if (filterObj.queries[range].from) {
-          const parsed = parseDate(filterObj.queries[range].from, minoffset, true)
-          filterObj.queries[range].from = parsed ? Math.floor(parsed / 1000) : null
+          const relativeMatch = filterObj.queries[range].from.match(/^(<|>)(.*)$/)
+          if (relativeMatch && relativeMatch[2]) {
+            // Human-readable relative duration
+            filterObj.queries[range] = parseRelativeDuration(relativeMatch[1], relativeMatch[2], true, (range === 'expiry'))
+            continue
+          } else {
+            const parsed = parseDate(filterObj.queries[range].from, true)
+            filterObj.queries[range].from = parsed ? Math.floor(parsed / 1000) : null
+          }
         }
         if (filterObj.queries[range].to) {
-          const parsed = parseDate(filterObj.queries[range].to, minoffset, true)
+          const parsed = parseDate(filterObj.queries[range].to, true)
           filterObj.queries[range].to = parsed ? Math.ceil(parsed / 1000) : null
         }
       }

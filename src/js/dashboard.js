@@ -1163,14 +1163,14 @@ page.uploadFiltersHelp = element => {
     Negation sign can also be used to exclude uploads with no albums (i.e. <code>-albumid:-</code>).`}
 
     There are 2 range keys: <b>date</b> (upload date) and <b>expiry</b> (expiry date).
-    Their format is: <code>"YYYY/MM/DD HH:MM:SS-YYYY/MM/DD HH:MM:SS"</code> ("from" date and "to" date respectively),
-    OR unix timestamps in seconds resolution.
+    Their formats are: <code>"YYYY/MM/DD HH:MM:SS-YYYY/MM/DD HH:MM:SS"</code> ("from" date and "to" date respectively),
+    unix timestamps in seconds resolution, OR human-readable relative time duration (<a href="https://github.com/jkroso/parse-duration/tree/50ebcc8a971c753bd1162332ccf5f3ef1e0b3a7e#available-unit-types-are" target="_blank" rel="noopener">available units</a>).
     You may choose to specify only either dates.
     If "to" date is missing, 'now' will be used. If "from" date is missing, 'beginning of time' will be used.
     If any of the subsequent date or time units are not specified, their first value will be used (e.g. January for month, 1 for day, and so on).
     If only time is specified, today's date will be used.
     If you do not need to specify both date and time, you may omit the double quotes.
-    In conclusion, the following examples are all valid: <code>date:"2020/01/01 01:23-2018/01/01 06"</code>, <code>expiry:-2020/05</code>, <code>date:12:34:56</code>.
+    In conclusion, the following examples are all valid: <code>date:"2020/01/01 01:23-2018/01/01 06"</code>, <code>expiry:-2020/05</code>, <code>date:12:34:56</code>, <code>date:1663976000</code>, <code>date:<7days</code>.
     <b>date</b> and <b>expiry</b> keys can only be specified once each.
 
     <b>What about timezones?</b>
@@ -1224,6 +1224,12 @@ page.uploadFiltersHelp = element => {
     <code>date:"2020/04/07 12-2020/04/07 23:59:59"</code>
     - Uploads uploaded before "5 February 2020 00:00:00":
     <code>date:-2020/02/05</code>
+    - Uploads uploaded within the last 24 hours (1 day):
+    <code>date:<1d</code>
+    - Uploads uploaded before the last 6 months:
+    <code>date:>6months</code>
+    - Uploads that will expire within the next 7 days and 12 hours:
+    <code>expiry:"<7 days 12 hours"</code>
     - Uploads which file names match "*.gz" but NOT "*.tar.gz":
     <code>*.gz -*.tar.gz</code>
     - Sort matches by "size" column in ascending and descending order respectively:
