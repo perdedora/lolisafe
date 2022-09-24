@@ -1250,6 +1250,9 @@ page.uniquifyUploadsFilters = string => {
 
   const uniquified = filtersArray
     .filter((v, i, a) => {
+      // Filter out invalid values
+      if (!v) return false
+
       const match = v.match(/^(sort|orderby):(\w+)(:.*)?$/i)
       // Uniquify sort/orderby filters by their keys
       if (match && match[2]) {
@@ -1259,7 +1262,7 @@ page.uniquifyUploadsFilters = string => {
         return lastIndex === i
       }
       // Uniquify other filters by exact string matches
-      return i !== a.lastIndexOf(v)
+      return i === a.lastIndexOf(v)
     })
 
   return uniquified
