@@ -1507,7 +1507,7 @@ self.list = async (req, res) => {
 
         sortObj.parsed.push({
           column,
-          order: (tmp[1] && /^d/.test(tmp[1])) ? 'desc' : 'asc',
+          order: (tmp[1] && /^d/i.test(tmp[1])) ? 'desc' : 'asc',
           clause: sortObj.nullsLast.includes(column) ? 'nulls last' : '',
           cast: sortObj.casts[column] || null
         })

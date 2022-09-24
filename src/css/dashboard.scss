@@ -160,6 +160,10 @@ li[data-action="page-ellipsis"] {
     &[title] {
       cursor: help
     }
+
+    &[data-action] {
+      cursor: pointer
+    }
   }
 }
 

@@ -371,11 +371,12 @@ page.domClick = event => {
       return page.bulkDeleteUploads()
     case 'display-preview':
       return page.displayPreview(id)
-    // Manage uploads
     case 'upload-filters-help':
       return page.uploadFiltersHelp(element)
     case 'filter-uploads':
       return page.filterUploads(element)
+    case 'sort-uploads':
+      return page.sortUploads(element)
     // Manage your albums
     case 'submit-album':
       return page.submitAlbum(element)
@@ -398,16 +399,17 @@ page.domClick = event => {
       return page.deleteUser(id)
     case 'view-user-uploads':
       return page.viewUserUploads(id, element)
-    // Others
+    // Manage your token
     case 'get-new-token':
       return page.getNewToken(element)
-    // Uploads & Users
+    // Shared (uploads, albums, users)
     case 'clear-selection':
       return page.clearSelection()
     case 'select':
       return page.select(element, event)
     case 'select-all':
       return page.selectAll(element)
+    // Shared pagination (uploads, albums, users)
     case 'page-ellipsis':
       return page.focusJumpToPage(element)
     case 'page-prev':
@@ -821,14 +823,14 @@ page.getUploads = (params = {}) => {
             <thead>
               <tr>
                 <th class="controls"><input id="selectAll" class="checkbox" type="checkbox" title="Select all" data-action="select-all"></th>
-                <th title="Key: name">File name</th>
-                ${showOriginalNames ? '<th title="Key: original">Original name</th>' : ''}
-                ${params.all ? '<th title="Key: userid">User</th>' : ''}
-                ${!params.all || filterAllByAlbums ? '<th title="Key: albumid">Album</th>' : ''}
-                <th title="Key: size">Size</th>
-                ${params.all ? '<th title="Key: ip">IP</th>' : ''}
-                <th title="Key: timestamp">Upload date</th>
-                ${hasExpiryDateColumn ? '<th title="Key: expirydate">Expiry date</th>' : ''}
+                <th title="Key: name" data-action="sort-uploads">File name</th>
+                ${showOriginalNames ? '<th title="Key: original" data-action="sort-uploads">Original name</th>' : ''}
+                ${params.all ? '<th title="Key: userid" data-action="sort-uploads">User</th>' : ''}
+                ${!params.all || filterAllByAlbums ? '<th title="Key: albumid" data-action="sort-uploads">Album</th>' : ''}
+                <th title="Key: size" data-action="sort-uploads" data-default-sort="desc">Size</th>
+                ${params.all ? '<th title="Key: ip" data-action="sort-uploads">IP</th>' : ''}
+                <th title="Key: timestamp" data-action="sort-uploads">Upload date</th>
+                ${hasExpiryDateColumn ? '<th title="Key: expirydate" data-action="sort-uploads">Expiry date</th>' : ''}
                 <th class="has-text-right">(${response.data.count} total)</th>
               </tr>
             </thead>
@@ -1239,14 +1241,80 @@ page.uploadFiltersHelp = element => {
   document.body.querySelector('.swal-overlay .swal-modal:not(.is-expanded)').classList.add('is-expanded')
 }
 
-page.filterUploads = element => {
-  const filters = document.querySelector(`#${element.dataset.filtersid || 'filters'}`).value
+page.uniquifyUploadsFilters = string => {
+  const filters = string
     .trim()
     .replace(/\t/g, ' ')
-    .replace(/(^|\s)((albumid|ip|user|date|expiry|is|sort|orderby):)\s+/g, '$2')
+    .replace(/(^|\s)((albumid|ip|user|date|expiry|is|sort|orderby):)\s+/gi, '$2')
+  const filtersArray = filters.split(' ')
+
+  const uniquified = filtersArray
+    .filter((v, i, a) => {
+      const match = v.match(/^(sort|orderby):(\w+)(:.*)?$/i)
+      // Uniquify sort/orderby filters by their keys
+      if (match && match[2]) {
+        const lastIndex = a.findLastIndex(v => {
+          return new RegExp(`^(sort|orderby):${match[2]}(:.*)?$`, 'i').test(v)
+        })
+        return lastIndex === i
+      }
+      // Uniquify other filters by exact string matches
+      return i !== a.lastIndexOf(v)
+    })
+
+  return uniquified
+}
+
+page.filterUploads = element => {
+  const filters = document.querySelector(`#${element.dataset.filtersid || 'filters'}`).value
+  const filtersArray = page.uniquifyUploadsFilters(filters)
+
   // eslint-disable-next-line compat/compat
   page.getUploads(Object.assign(page.views[page.currentView], {
-    filters,
+    filters: filtersArray.join(' '),
+    pageNum: 0,
+    trigger: element
+  }))
+}
+
+page.sortUploads = element => {
+  const title = element.title
+  if (!title) return
+
+  const _match = title.match(/^key: (.*)$/i)
+  if (!_match || !_match[1]) return
+
+  const defaultSort = element.dataset.defaultSort || 'asc'
+  const regex = new RegExp(`^(sort|orderby):(${_match[1]})(:.*)?$`, 'i')
+
+  const filters = document.querySelector('#filters').value
+  const filtersArray = page.uniquifyUploadsFilters(filters)
+
+  let direction = defaultSort
+  const cleaned = filtersArray
+    .filter((v, i, a) => {
+      const match = v.match(regex)
+      // Filter out sort filter(s) with the same key
+      if (match && match[2]) {
+        // Inverse sorting direction if required
+        if (match[3]) {
+          if (/^:d/i.test(match[3])) {
+            direction = 'asc'
+          } else {
+            direction = 'desc'
+          }
+        }
+        return false
+      }
+      return true
+    })
+
+  // Insert new sort filter
+  cleaned.push(`sort:${_match[1]}:${direction}`)
+
+  // eslint-disable-next-line compat/compat
+  page.getUploads(Object.assign(page.views[page.currentView], {
+    filters: cleaned.join(' '),
     pageNum: 0,
     trigger: element
   }))
