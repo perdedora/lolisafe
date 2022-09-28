@@ -551,8 +551,8 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
   }
 
   const urls = req.body.urls
-  if (!urls || !(urls instanceof Array)) {
-    throw new ClientError('Missing "urls" property (array).')
+  if (!Array.isArray(urls) || !urls.length || urls.some(url => !/^https?:\/\//.test(url))) {
+    throw new ClientError('Bad request.')
   }
 
   if (urls.length > maxFilesPerUpload) {
