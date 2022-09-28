@@ -369,7 +369,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
         albumid: data.albumid,
         age: data.age,
         originalname: field.file.name || '',
-        mimetype: field.mime_type || '',
+        mimetype: field.mime_type || 'application/octet-stream'
       }
       req.files.push(file)
 
@@ -879,7 +879,7 @@ self.actuallyFinishChunks = async (req, res, files) => {
       filename: name,
       originalname: file.original || '',
       extname,
-      mimetype: file.type || '',
+      mimetype: file.type || 'application/octet-stream',
       path: destination,
       size,
       hash,
