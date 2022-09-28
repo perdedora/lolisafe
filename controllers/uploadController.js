@@ -1030,7 +1030,8 @@ self.storeFilesToDb = async (req, res, filesData) => {
   const stored = []
   const albumids = []
 
-  await Promise.all(filesData.map(async file => {
+  // for-loop to prioritize sequential ordering over multiple async sub-tasks
+  for (const file of filesData) {
     if (enableHashing) {
       // Check if the file exists by checking its hash and size
       const dbFile = await utils.db.table('files')
@@ -1045,8 +1046,6 @@ self.storeFilesToDb = async (req, res, filesData) => {
           hash: file.hash,
           size: String(file.size)
         })
-        // Select expirydate to display expiration date of existing files as well
-        .select('name', 'expirydate')
         .first()
 
       if (dbFile) {
@@ -1064,7 +1063,7 @@ self.storeFilesToDb = async (req, res, filesData) => {
           file: dbFile,
           repeated: true
         })
-        return
+        continue
       }
     }
 
@@ -1098,7 +1097,7 @@ self.storeFilesToDb = async (req, res, filesData) => {
     if (utils.mayGenerateThumb(file.extname)) {
       utils.generateThumbs(file.filename, file.extname, true).catch(logger.error)
     }
-  }))
+  }
 
   const fresh = stored.filter(entry => !entry.repeated)
   if (fresh.length) {
@@ -1147,7 +1146,10 @@ self.sendUploadResponse = async (req, res, stored) => {
     files: stored.map(entry => {
       const map = {
         name: entry.file.name,
-        url: `${utils.conf.domain ? `${utils.conf.domain}/` : ''}${entry.file.name}`
+        original: entry.file.original,
+        url: `${utils.conf.domain ? `${utils.conf.domain}/` : ''}${entry.file.name}`,
+        hash: entry.file.hash,
+        size: Number(entry.file.size)
       }
 
       // If a temporary upload, add expiry date
