@@ -506,12 +506,11 @@ self.actuallyUpload = async (req, res, data = {}) => {
   // If for some reason Request.multipart() resolves before a file's Promise
   // Typically caused by something hanging up longer than
   // uWebSockets.js' internal security timeout (10 seconds)
-  if (req.files.some(file => file.promised !== true)) {
+  if (req.files.some(file => !file.promised)) {
     // Clean up temp files and held identifiers (do not wait)
     cleanUpFiles()
     unfreezeChunksData()
-
-    throw new ServerError()
+    throw new Error('Request.multipart() resolved before a file\'s Promise')
   }
 
   // If chunked uploads is enabled and the uploaded file is a chunk, then just say that it was a success
