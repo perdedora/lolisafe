@@ -605,7 +605,7 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
         }
       }
     } catch (ex) {
-      // Re-throw only if ClientError, otherwise ignore
+      // Re-throw only if ClientError (can be thrown by assertSize()), otherwise ignore
       if (ex instanceof ClientError) {
         throw ex
       }
@@ -654,6 +654,10 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
           res.body.pipe(writeStream)
           writeStream.once('finish', () => resolve(res))
         }))
+        .catch(ex => {
+          // Re-throw node-fetch's errors as regular ClientError
+          throw new ClientError(`${ex.code ? `${ex.code}: ` : ''}${ex.message}`)
+        })
 
       if (fetchFile.status !== 200) {
         throw new ServerError(`${fetchFile.status} ${fetchFile.statusText}`)
@@ -734,19 +738,8 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
       }))
     }
 
-    // Re-throw suppressed errors as ClientError, otherwise as-is
-    const errorString = error.toString()
-    const suppress = [
-      / network timeout at:/,
-      / over limit:/
-    ]
-    if (suppress.some(t => t.test(errorString))) {
-      throw new ClientError(errorString)
-    } else if (errorString.startsWith('AbortError:')) {
-      throw new ClientError('Fetch timed out. Try again?')
-    } else {
-      throw error
-    }
+    // Re-throw errors
+    throw error
   })
 
   if (utils.scan.instance) {
