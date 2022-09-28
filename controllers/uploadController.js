@@ -550,8 +550,8 @@ self.actuallyUpload = async (req, res, data = {}) => {
 
   await self.stripTags(req, filesData)
 
-  const result = await self.storeFilesToDb(req, res, filesData)
-  return self.sendUploadResponse(req, res, result)
+  const stored = await self.storeFilesToDb(req, res, filesData)
+  return self.sendUploadResponse(req, res, stored)
 }
 
 /** URL uploads */
@@ -767,8 +767,8 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
     }
   }
 
-  const result = await self.storeFilesToDb(req, res, filesData)
-  return self.sendUploadResponse(req, res, result)
+  const stored = await self.storeFilesToDb(req, res, filesData)
+  return self.sendUploadResponse(req, res, stored)
 }
 
 /** Chunk uploads */
@@ -897,8 +897,8 @@ self.actuallyFinishChunks = async (req, res, files) => {
 
   await self.stripTags(req, filesData)
 
-  const result = await self.storeFilesToDb(req, res, filesData)
-  return self.sendUploadResponse(req, res, result)
+  const stored = await self.storeFilesToDb(req, res, filesData)
+  return self.sendUploadResponse(req, res, stored)
 }
 
 self.cleanUpChunks = async uuid => {
@@ -1028,8 +1028,7 @@ self.stripTags = async (req, filesData) => {
 /** Database functions */
 
 self.storeFilesToDb = async (req, res, filesData) => {
-  const files = []
-  const exists = []
+  const stored = []
   const albumids = []
 
   await Promise.all(filesData.map(async file => {
@@ -1062,7 +1061,10 @@ self.storeFilesToDb = async (req, res, filesData) => {
           dbFile.original = file.originalname
         }
 
-        exists.push(dbFile)
+        stored.push({
+          file: dbFile,
+          repeated: true
+        })
         return
       }
     }
@@ -1091,7 +1093,7 @@ self.storeFilesToDb = async (req, res, filesData) => {
       data.expirydate = data.timestamp + (file.age * 3600) // Hours to seconds
     }
 
-    files.push(data)
+    stored.push({ file: data })
 
     // Generate thumbs, but do not wait
     if (utils.mayGenerateThumb(file.extname)) {
@@ -1099,7 +1101,8 @@ self.storeFilesToDb = async (req, res, filesData) => {
     }
   }))
 
-  if (files.length) {
+  const fresh = stored.filter(entry => !entry.repeated)
+  if (fresh.length) {
     // albumids should be empty if non-registerd users (no auth requests)
     let authorizedIds = []
     if (albumids.length) {
@@ -1110,9 +1113,9 @@ self.storeFilesToDb = async (req, res, filesData) => {
         .then(rows => rows.map(row => row.id))
 
       // Remove albumid if user do not own the album
-      for (const file of files) {
-        if (file.albumid !== null && !authorizedIds.includes(file.albumid)) {
-          file.albumid = null
+      for (const entry of fresh) {
+        if (entry.file.albumid !== null && !authorizedIds.includes(entry.file.albumid)) {
+          entry.file.albumid = null
         }
       }
     }
@@ -1120,7 +1123,7 @@ self.storeFilesToDb = async (req, res, filesData) => {
     await utils.db.transaction(async trx => {
       // Insert new files to DB
       await trx('files')
-        .insert(files)
+        .insert(fresh.map(entry => entry.file))
       utils.invalidateStatsCache('uploads')
 
       // Update albums' timestamp
@@ -1133,35 +1136,39 @@ self.storeFilesToDb = async (req, res, filesData) => {
     })
   }
 
-  return [...files, ...exists]
+  return stored
 }
 
 /** Final response */
 
-self.sendUploadResponse = async (req, res, result) => {
+self.sendUploadResponse = async (req, res, stored) => {
   // Send response
   return res.json({
     success: true,
-    files: result.map(file => {
+    files: stored.map(entry => {
       const map = {
-        name: file.name,
-        url: `${utils.conf.domain ? `${utils.conf.domain}/` : ''}${file.name}`
+        name: entry.file.name,
+        url: `${utils.conf.domain ? `${utils.conf.domain}/` : ''}${entry.file.name}`
       }
 
       // If a temporary upload, add expiry date
-      if (file.expirydate) {
-        map.expirydate = file.expirydate
+      if (entry.file.expirydate) {
+        map.expirydate = entry.file.expirydate
       }
 
       // If on /nojs route, add original name
       if (req.path === '/nojs') {
-        map.original = file.original
+        map.original = entry.file.original
       }
 
       // If uploaded by user, add delete URL (intended for ShareX and its derivatives)
       // Homepage uploader will not use this (use dashboard instead)
       if (req.locals.user) {
-        map.deleteUrl = `${utils.conf.homeDomain || ''}/file/${file.name}?delete`
+        map.deleteUrl = `${utils.conf.homeDomain || ''}/file/${entry.file.name}?delete`
+      }
+
+      if (entry.repeated) {
+        map.repeated = true
       }
 
       return map
