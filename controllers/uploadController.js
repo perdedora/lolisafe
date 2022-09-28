@@ -354,7 +354,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
         name = name.replace(/^dz/, '')
       }
 
-      req.body[name] = field.value
+      req.body[name] = field.value || ''
       return
     }
 
@@ -370,12 +370,11 @@ self.actuallyUpload = async (req, res, data = {}) => {
         age: data.age,
         originalname: field.file.name || '',
         mimetype: field.mime_type || '',
-        isChunk: req.body.uuid !== undefined &&
-          req.body.chunkindex !== undefined
       }
       req.files.push(file)
 
-      if (file.isChunk) {
+      const isChunk = typeof req.body.uuid === 'string' && Boolean(req.body.uuid)
+      if (isChunk) {
         if (!chunkedUploads) {
           throw new ClientError('Chunked uploads are disabled at the moment.')
         } else if (req.files.length > 1) {
@@ -388,7 +387,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
         throw new ClientError(`${file.extname ? `${file.extname.substr(1).toUpperCase()} files` : 'Files with no extension'} are not permitted.`)
       }
 
-      if (file.isChunk) {
+      if (isChunk) {
         // Re-map UUID property to IP-specific UUID
         const uuid = `${req.ip}_${req.body.uuid}`
         // Calling initChunks() will also reset the chunked uploads' timeout
@@ -420,7 +419,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
 
         readStream.once('error', _reject)
 
-        if (file.isChunk) {
+        if (file.chunksData) {
           writeStream = file.chunksData.writeStream
           hashStream = file.chunksData.hashStream
         } else {
@@ -444,7 +443,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
           })
         }
 
-        if (file.isChunk) {
+        if (file.chunksData) {
           // We listen for readStream's end event
           readStream.once('end', () => _resolve())
         } else {
@@ -464,7 +463,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
         // Pipe readStream to writeStream
         // Do not end writeStream when readStream finishes if it's a chunk upload
         readStream
-          .pipe(writeStream, { end: !file.isChunk })
+          .pipe(writeStream, { end: !file.chunksData })
       }).catch(error => {
         // Dispose of unfinished write & hasher streams
         if (writeStream && !writeStream.destroyed) {
@@ -477,13 +476,13 @@ self.actuallyUpload = async (req, res, data = {}) => {
         // Re-throw error
         throw error
       }).finally(() => {
-        if (!file.isChunk) return
+        if (!file.chunksData) return
         // Unlisten streams' error event for this Request if it's a chunk upload
         utils.unlistenEmitters([writeStream, hashStream], 'error', _reject)
       })
 
       // file.size is not populated if a chunk upload, so ignore
-      if (config.filterEmptyFile && !file.isChunk && file.size === 0) {
+      if (config.filterEmptyFile && !file.chunksData && file.size === 0) {
         throw new ClientError('Empty files are not allowed.')
       }
     }
@@ -780,22 +779,27 @@ self.finishChunks = async (req, res) => {
   }
 
   const files = req.body.files
-  if (!Array.isArray(files) || !files.length) {
+  if (!Array.isArray(files) || !files.length || files.some(file => {
+    return typeof file !== 'object' || !file.uuid
+  })) {
     throw new ClientError('Bad request.')
   }
 
   // Re-map UUID property to IP-specific UUID
   files.forEach(file => {
     file.uuid = `${req.ip}_${file.uuid}`
+    file.chunksData = chunksData[file.uuid]
   })
+
+  if (files.some(file => !file.chunksData || file.chunksData.processing)) {
+    throw new ClientError('Invalid file UUID, chunks data had already timed out, or is still processing. Try again?')
+  }
 
   return self.actuallyFinishChunks(req, res, files)
     .catch(error => {
       // Unlink temp files (do not wait)
       Promise.all(files.map(async file => {
-        if (file.uuid && chunksData[file.uuid]) {
-          return self.cleanUpChunks(file.uuid).catch(logger.error)
-        }
+        return self.cleanUpChunks(file.uuid).catch(logger.error)
       }))
       // Re-throw errors
       throw error
@@ -805,14 +809,6 @@ self.finishChunks = async (req, res) => {
 self.actuallyFinishChunks = async (req, res, files) => {
   const filesData = []
   await Promise.all(files.map(async file => {
-    if (!file.uuid || typeof chunksData[file.uuid] === 'undefined') {
-      throw new ClientError('Invalid file UUID, or chunks data had already timed out. Try again?')
-    }
-
-    if (chunksData[file.uuid].processing) {
-      throw new ClientError('Previous chunk upload is still being processed. Try again?')
-    }
-
     // Suspend timeout
     // If the chunk errors out there, it will be immediately cleaned up anyway
     chunksData[file.uuid].clearTimeout()
@@ -835,7 +831,7 @@ self.actuallyFinishChunks = async (req, res, files) => {
 
     const age = self.assertRetentionPeriod(req.locals.user, file.age)
 
-    let size = file.size
+    let size = typeof file.size === 'number' ? file.size : undefined
     if (size === undefined) {
       size = bytesWritten
     } else if (size !== bytesWritten) {
@@ -906,6 +902,8 @@ self.actuallyFinishChunks = async (req, res, files) => {
 }
 
 self.cleanUpChunks = async uuid => {
+  if (!uuid || !chunksData[uuid]) return
+
   // Dispose of unfinished write & hasher streams
   if (chunksData[uuid].writeStream && !chunksData[uuid].writeStream.destroyed) {
     chunksData[uuid].writeStream.destroy()

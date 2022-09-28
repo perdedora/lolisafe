@@ -396,7 +396,7 @@ self.edit = async (req, res) => {
     throw new ClientError('Could not get album with the specified ID.')
   }
 
-  const albumNewState = (ismoderator && typeof req.body.enabled !== 'undefined')
+  const albumNewState = (ismoderator && req.body.enabled !== undefined)
     ? Boolean(req.body.enabled)
     : null
 
