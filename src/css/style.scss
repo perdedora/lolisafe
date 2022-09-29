@@ -270,6 +270,23 @@ fieldset[disabled] .select select:hover {
   padding-bottom: 6.5rem
 }
 
+/** SimpleLightbox **/
+
+.sl-wrapper {
+  .sl-close,
+  .sl-navigation button {
+    color: $white
+  }
+
+  .sl-image .sl-caption {
+    background: rgb(0 0 0 / 60%)
+  }
+}
+
+.sl-overlay {
+  background: $black
+}
+
 /** Floating home button **/
 
 a.floating-home-button {
