@@ -54,8 +54,8 @@ const page = {
   urlsQueue: [],
   activeUrlsQueue: 0,
 
-  // Include BMP for uploads preview only, cause the real images will be used
-  // Sharp isn't capable of making their thumbnails for dashboard and album public pages
+  // Include BMP for uploads preview only, because the real images will be used instead of server-generated thumbnails
+  // Sharp is not capable of generating thumbnails for BMP images
   imageExts: ['.gif', '.jpeg', '.jpg', '.png', '.svg', '.tif', '.tiff', '.webp', '.bmp'],
   videoExts: ['.avi', '.m2ts', '.m4v', '.mkv', '.mov', '.mp4', '.webm', '.wmv'],
 

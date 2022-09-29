@@ -1,10 +1,15 @@
-/* global LazyLoad */
+/* global LazyLoad, SimpleLightbox */
 
 // eslint-disable-next-line no-unused-vars
 const lsKeys = {}
 
 const page = {
-  lazyLoad: null
+  lazyLoad: null,
+  lightbox: null,
+
+  // Array of extensions that will be whitelisted for SimpleLightbox
+  // Should only include image extensions that can be rendered directly on browsers
+  lightboxExts: ['.gif', '.jpeg', '.jpg', '.png', '.svg', '.tif', '.tiff', '.webp', '.bmp']
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -26,4 +31,23 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   page.lazyLoad = new LazyLoad()
+
+  // Build RegExp out of imageExts array
+  // SimpleLightbox demands RegExp for configuring supported file extensions
+  const imageExtsRegex = new RegExp(`${page.lightboxExts.map(ext => {
+    return ext.substring(1) // removes starting dot
+  }).join('|')}`, 'i')
+
+  console.log(imageExtsRegex)
+  page.lightbox = new SimpleLightbox('#table a.image', {
+    captions: true,
+    captionSelector: 'img',
+    captionType: 'attr',
+    captionsData: 'alt',
+    captionPosition: 'bottom',
+    captionDelay: 500,
+    fileExt: imageExtsRegex,
+    preloading: false,
+    uniqueImages: false
+  })
 })
