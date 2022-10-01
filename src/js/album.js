@@ -13,21 +13,18 @@ const page = {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const files = document.querySelectorAll('.image-container')
+  // Prettify all .file-size elements
+  const sizeElements = document.querySelectorAll('.file-size')
+  for (let i = 0; i < sizeElements.length; i++) {
+    const string = sizeElements[i].dataset.value || sizeElements[i].innerHTML
+    sizeElements[i].innerHTML = page.getPrettyBytes(parseInt(string, 10))
+  }
 
-  // Prettify individual file's data rows
-  for (let i = 0; i < files.length; i++) {
-    const sizeElem = files[i].querySelector('.details .file-size')
-    if (sizeElem) {
-      const str = sizeElem.dataset.value || sizeElem.innerHTML.replace(/\s*B$/i, '')
-      sizeElem.innerHTML = page.getPrettyBytes(parseInt(str))
-    }
-
-    const dateElem = files[i].querySelector('.details .file-date')
-    if (dateElem) {
-      const str = dateElem.dataset.value
-      dateElem.innerHTML = page.getPrettyDate(new Date(parseInt(str) * 1000))
-    }
+  // Prettify all .file-date elements
+  const dateElements = document.querySelectorAll('.file-date')
+  for (let i = 0; i < dateElements.length; i++) {
+    const string = dateElements[i].dataset.value
+    dateElements[i].innerHTML = page.getPrettyDate(new Date(parseInt(string, 10) * 1000))
   }
 
   page.lazyLoad = new LazyLoad()
@@ -38,7 +35,6 @@ window.addEventListener('DOMContentLoaded', () => {
     return ext.substring(1) // removes starting dot
   }).join('|')}`, 'i')
 
-  console.log(imageExtsRegex)
   page.lightbox = new SimpleLightbox('#table a.image', {
     captions: true,
     captionSelector: 'img',
