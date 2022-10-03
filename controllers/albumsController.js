@@ -1,5 +1,5 @@
 const EventEmitter = require('events')
-const fs = require('fs')
+const jetpack = require('fs-jetpack')
 const path = require('path')
 const randomstring = require('randomstring')
 const Zip = require('jszip')
@@ -178,20 +178,16 @@ self.list = async (req, res) => {
 
     // Map by IDs
     albumids[album.id] = album
-  }
 
-  const getAlbumZipSize = async album => {
-    if (!album.zipGeneratedAt) return
-    try {
+    // Get ZIP size
+    if (album.zipGeneratedAt) {
       const filePath = path.join(paths.zips, `${album.identifier}.zip`)
-      const stats = await paths.stat(filePath)
-      albumids[album.id].zipSize = stats.size
-    } catch (error) {
-      if (error.code !== 'ENOENT') logger.error(error)
+      const stats = await jetpack.inspectAsync(filePath)
+      if (stats) {
+        album.zipSize = stats.size
+      }
     }
   }
-
-  await Promise.all(result.albums.map(album => getAlbumZipSize(album)))
 
   const uploads = await utils.db.table('files')
     .whereIn('albumid', Object.keys(albumids))
@@ -348,14 +344,7 @@ self.disable = async (req, res) => {
   utils.deleteStoredAlbumRenders([id])
   utils.invalidateStatsCache('albums')
 
-  try {
-    await paths.unlink(path.join(paths.zips, `${album.identifier}.zip`))
-  } catch (error) {
-    // Re-throw non-ENOENT error
-    if (error.code !== 'ENOENT') {
-      throw error
-    }
-  }
+  await jetpack.removeAsync(path.join(paths.zips, `${album.identifier}.zip`))
 
   return res.json({ success: true })
 }
@@ -443,16 +432,10 @@ self.edit = async (req, res) => {
   utils.invalidateStatsCache('albums')
 
   if (req.body.requestLink) {
-    // Rename zip archive of the album if it exists
-    try {
-      const oldZip = path.join(paths.zips, `${album.identifier}.zip`)
-      const newZip = path.join(paths.zips, `${update.identifier}.zip`)
-      await paths.rename(oldZip, newZip)
-    } catch (error) {
-      // Re-throw non-ENOENT error
-      if (error.code !== 'ENOENT') {
-        throw error
-      }
+    // Rename album ZIP if it exists
+    const zipFullPath = path.join(paths.zips, `${album.identifier}.zip`)
+    if (await jetpack.existsAsync(zipFullPath) === 'file') {
+      await jetpack.rename(zipFullPath, `${update.identifier}.zip`)
     }
 
     return res.json({
@@ -589,16 +572,10 @@ self.generateZip = async (req, res) => {
   }
 
   if (album.zipGeneratedAt > album.editedAt) {
-    try {
-      const filePath = path.join(paths.zips, `${identifier}.zip`)
-      await paths.access(filePath)
+    const filePath = path.join(paths.zips, `${identifier}.zip`)
+    if (await jetpack.existsAsync(filePath) === 'file') {
       await res.download(filePath, `${album.name}.zip`)
       return
-    } catch (error) {
-      // Re-throw non-ENOENT error
-      if (error.code !== 'ENOENT') {
-        throw error
-      }
     }
   }
 
@@ -648,13 +625,13 @@ self.generateZip = async (req, res) => {
     // Since we are adding all files concurrently,
     // their order in the ZIP file may not be in alphabetical order.
     // However, ZIP viewers in general should sort the files themselves.
-    await Promise.all(files.map(async file => {
-      const data = await paths.readFile(path.join(paths.uploads, file.name))
-      archive.file(file.name, data)
-    }))
+    for (const file of files) {
+      const fullPath = path.join(paths.uploads, file.name)
+      archive.file(file.name, jetpack.createReadStream(fullPath))
+    }
     await new Promise((resolve, reject) => {
       archive.generateNodeStream(zipOptions)
-        .pipe(fs.createWriteStream(zipPath))
+        .pipe(jetpack.createWriteStream(zipPath))
         .on('error', error => reject(error))
         .on('finish', () => resolve())
     })
