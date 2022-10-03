@@ -439,7 +439,7 @@ self.edit = async (req, res) => {
     // Rename album ZIP if it exists
     const zipFullPath = path.join(paths.zips, `${album.identifier}.zip`)
     if (await jetpack.existsAsync(zipFullPath) === 'file') {
-      await jetpack.rename(zipFullPath, `${update.identifier}.zip`)
+      await jetpack.renameAsync(zipFullPath, `${update.identifier}.zip`)
     }
 
     return res.json({
