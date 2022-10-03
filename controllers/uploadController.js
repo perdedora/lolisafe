@@ -1,6 +1,6 @@
 const blake3 = require('blake3')
 const contentDisposition = require('content-disposition')
-const fs = require('fs')
+const jetpack = require('fs-jetpack')
 const parseDuration = require('parse-duration')
 const path = require('path')
 const randomstring = require('randomstring')
@@ -56,8 +56,6 @@ const chunkedUploadsTimeout = config.uploads.chunkSize.timeout || 1800000
 const chunksData = {}
 // Hard-coded min chunk size of 1 MB (e.g. 50 MB = max 50 chunks)
 const maxChunksCount = maxSize
-// Use fs.copyFile() instead of fs.rename() if chunks dir is NOT inside uploads dir
-const chunksCopyFile = !paths.chunks.startsWith(paths.uploads)
 
 const extensionsFilter = Array.isArray(config.extensionsFilter) &&
   config.extensionsFilter.length
@@ -110,19 +108,10 @@ class ChunksData {
 const initChunks = async uuid => {
   if (chunksData[uuid] === undefined) {
     chunksData[uuid] = new ChunksData(uuid)
-
-    const exist = await paths.access(chunksData[uuid].root)
-      .catch(err => {
-        // Re-throw error only if not directory is missing error
-        if (err.code !== 'ENOENT') throw err
-        return false
-      })
-    if (!exist) {
-      await paths.mkdir(chunksData[uuid].root)
-    }
+    await jetpack.dirAsync(chunksData[uuid].root, { empty: true })
 
     // Init write & hasher streams
-    chunksData[uuid].writeStream = fs.createWriteStream(chunksData[uuid].path, { flags: 'a' })
+    chunksData[uuid].writeStream = jetpack.createWriteStream(chunksData[uuid].path, { flags: 'a' })
     chunksData[uuid].hashStream = enableHashing && blake3.createHash()
   } else if (chunksData[uuid].processing) {
     // Wait for the first spawned init tasks
@@ -204,14 +193,11 @@ self.getUniqueUploadIdentifier = async (length, extension = '', res) => {
       }
     } else {
       // Otherwise, check for physical files' full name matches
-      try {
-        const name = identifier + extension
-        await paths.access(path.join(paths.uploads, name))
+      const name = identifier + extension
+      const exists = jetpack.existsAsync(path.join(paths.uploads, name))
+      if (exists) {
         logger.debug(`${name} is already in use (${i + 1}/${utils.idMaxTries}).`)
         continue
-      } catch (error) {
-        // Re-throw non-ENOENT error
-        if (error & error.code !== 'ENOENT') throw error
       }
     }
 
@@ -419,7 +405,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
           writeStream = file.chunksData.writeStream
           hashStream = file.chunksData.hashStream
         } else {
-          writeStream = fs.createWriteStream(file.path)
+          writeStream = jetpack.createWriteStream(file.path)
           hashStream = enableHashing && blake3.createHash()
         }
 
@@ -626,7 +612,7 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
     let hashStream
 
     return Promise.resolve().then(async () => {
-      writeStream = fs.createWriteStream(file.path)
+      writeStream = jetpack.createWriteStream(file.path)
       hashStream = enableHashing && blake3.createHash()
 
       // Reduce GET timeout by time already spent for HEAD request
@@ -652,6 +638,7 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
 
           if (hashStream) {
             hashStream.once('error', reject)
+            res.body.pause()
             res.body.on('data', d => hashStream.update(d))
           }
 
@@ -707,12 +694,11 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
       const _name = _identifier + file.extname
 
       // Move .tmp file to the new filename
-      const destination = path.join(paths.uploads, _name)
-      await paths.rename(file.path, destination)
+      await jetpack.renameAsync(file.path, _name)
 
       // Then update the props with renewed information
       file.filename = _name
-      file.path = destination
+      file.path = path.join(paths.uploads, _name)
 
       // Finalize other file props
       const contentType = fetchFile.headers.get('content-type')
@@ -834,9 +820,9 @@ self.actuallyFinishChunks = async (req, res, files) => {
     const tmpfile = path.join(chunksData[file.uuid].root, chunksData[file.uuid].filename)
 
     // Double-check file size
-    const lstat = await paths.lstat(tmpfile)
-    if (lstat.size !== size) {
-      throw new ClientError(`Resulting physical file size (${lstat.size}) does not match expected size (${size}).`)
+    const stat = await jetpack.inspectAsync(tmpfile)
+    if (stat.size !== size) {
+      throw new ClientError(`Resulting physical file size (${stat.size}) does not match expected size (${size}).`)
     }
 
     // Generate name
@@ -845,13 +831,8 @@ self.actuallyFinishChunks = async (req, res, files) => {
     const name = identifier + extname
 
     // Move tmp file to final destination
-    // For fs.copyFile(), tmpfile will eventually be unlinked by self.cleanUpChunks()
     const destination = path.join(paths.uploads, name)
-    if (chunksCopyFile) {
-      await paths.copyFile(tmpfile, destination)
-    } else {
-      await paths.rename(tmpfile, destination)
-    }
+    await jetpack.moveAsync(tmpfile, destination)
 
     // Continue even when encountering errors
     await self.cleanUpChunks(file.uuid).catch(logger.error)
@@ -898,15 +879,8 @@ self.cleanUpChunks = async uuid => {
     chunksData[uuid].hashStream.dispose()
   }
 
-  // Remove tmp file
-  await paths.unlink(path.join(chunksData[uuid].root, chunksData[uuid].filename))
-    .catch(error => {
-      // Re-throw non-ENOENT error
-      if (error.code !== 'ENOENT') logger.error(error)
-    })
-
-  // Remove UUID dir
-  await paths.rmdir(chunksData[uuid].root)
+  // Remove UUID dir and everything in it
+  await jetpack.removeAsync(chunksData[uuid].root)
 
   // Delete cached chunks data
   delete chunksData[uuid]
