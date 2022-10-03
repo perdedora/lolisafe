@@ -577,8 +577,15 @@ self.generateZip = async (req, res) => {
 
   if (album.zipGeneratedAt > album.editedAt) {
     const filePath = path.join(paths.zips, `${identifier}.zip`)
-    if (await jetpack.existsAsync(filePath) === 'file') {
-      await res.download(filePath, `${album.name}.zip`)
+    const stat = await jetpack.inspectAsync(filePath)
+    if (stat.type === 'file') {
+      const readStream = jetpack.createReadStream(filePath)
+      readStream.on('error', error => {
+        readStream.destroy()
+        logger.error(error)
+      })
+      // 2nd param will be set as Content-Length header (must be number)
+      await res.stream(readStream, stat.size)
       return
     }
   }
