@@ -244,9 +244,6 @@ safe.use('/api', api)
     // Init database
     await require('./controllers/utils/initDatabase')(utils.db)
 
-    // Purge any leftover in chunks directory, do not wait
-    paths.purgeChunks()
-
     if (!Array.isArray(config.pages) || !config.pages.length) {
       logger.error('Config file does not have any frontend pages enabled')
       process.exit(1)
