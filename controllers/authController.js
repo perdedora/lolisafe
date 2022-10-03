@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt')
+const jetpack = require('fs-jetpack')
 const path = require('path')
 const randomstring = require('randomstring')
 const paths = require('./pathsController')
@@ -437,15 +438,10 @@ self.deleteUser = async (req, res) => {
       .del()
     utils.deleteStoredAlbumRenders(albumids)
 
-    // Unlink their archives
-    await Promise.all(albums.map(async album => {
-      try {
-        await paths.unlink(path.join(paths.zips, `${album.identifier}.zip`))
-      } catch (error) {
-        // Re-throw non-ENOENT error
-        if (error.code !== 'ENOENT') throw error
-      }
-    }))
+    // Unlink their album ZIP archives
+    await Promise.all(albums.map(async album =>
+      jetpack.removeAsync(path.join(paths.zips, `${album.identifier}.zip`))
+    ))
   }
 
   await utils.db.table('users')
