@@ -613,7 +613,7 @@ self.stripTags = async (name, extname) => {
     throw new ServerError('An error occurred while stripping tags. The format may not be supported.')
   }
 
-  return true
+  return jetpack.inspectAsync(fullPath)
 }
 
 self.unlinkFile = async (filename, predb) => {

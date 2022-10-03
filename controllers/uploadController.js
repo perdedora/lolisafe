@@ -527,6 +527,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
     }
   }
 
+  // Strip tags, then update their size attribute, if required
   await self.stripTags(req, filesData)
 
   const stored = await self.storeFilesToDb(req, res, filesData)
@@ -862,6 +863,7 @@ self.actuallyFinishChunks = async (req, res, files) => {
     }
   }
 
+  // Strip tags, then update their size attribute, if required
   await self.stripTags(req, filesData)
 
   const stored = await self.storeFilesToDb(req, res, filesData)
@@ -971,9 +973,13 @@ self.stripTags = async (req, filesData) => {
   if (!self.parseStripTags(req.headers.striptags)) return
 
   try {
-    await Promise.all(filesData.map(async file =>
-      utils.stripTags(file.filename, file.extname)
-    ))
+    await Promise.all(filesData.map(async file => {
+      // Update size attribute if applicable
+      const stat = await utils.stripTags(file.filename, file.extname)
+      if (stat) {
+        file.size = stat.size
+      }
+    }))
   } catch (error) {
     // Unlink temp files (do not wait)
     Promise.all(filesData.map(async file =>
