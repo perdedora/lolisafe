@@ -26,8 +26,8 @@ try {
 // This will prevent IDE's Git from unnecessarily
 // building diff's during development.
 const dist = process.env.NODE_ENV === 'development'
-  ? path.join(__dirname, './dist-dev')
-  : path.join(__dirname, './dist')
+  ? path.join(__dirname, 'dist-dev')
+  : path.join(__dirname, 'dist')
 
 const postcssPlugins = [
   postcssPresetEnv()
