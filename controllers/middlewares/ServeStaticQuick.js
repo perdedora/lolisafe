@@ -21,7 +21,7 @@
 
 const chokidar = require('chokidar')
 const etag = require('etag')
-const fs = require('fs')
+const jetpack = require('fs-jetpack')
 const serveUtils = require('./../utils/serveUtils')
 const logger = require('./../../logger')
 
@@ -70,7 +70,8 @@ class ServeStaticQuick {
     this.files = new Map()
 
     this.watcher = chokidar.watch(this.directory, {
-      alwaysStat: true,
+      // fs.Stats object is already always available with add/addDir/change events
+      alwaysStat: false,
       awaitWriteFinish: {
         pollInterval: 100,
         stabilityThreshold: 500
@@ -220,7 +221,7 @@ class ServeStaticQuick {
 
   #stream (req, res, path, stat, result) {
     const fullPath = this.directory + path
-    const readStream = fs.createReadStream(fullPath, result.options)
+    const readStream = jetpack.createReadStream(fullPath, result.options)
 
     readStream.on('error', error => {
       readStream.destroy()

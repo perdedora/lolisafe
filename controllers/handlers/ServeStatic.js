@@ -19,10 +19,10 @@
 
 const contentDisposition = require('content-disposition')
 const etag = require('etag')
-const fs = require('fs')
+const fsPromises = require('fs/promises')
+const jetpack = require('fs-jetpack')
 const SimpleDataStore = require('./../utils/SimpleDataStore')
 const errors = require('./../errorsController')
-const paths = require('./../pathsController')
 const utils = require('./../utilsController')
 const serveUtils = require('./../utils/serveUtils')
 const logger = require('./../../logger')
@@ -106,7 +106,7 @@ class ServeStatic {
   }
 
   async #get (fullPath) {
-    const stat = await paths.stat(fullPath)
+    const stat = await fsPromises.stat(fullPath)
 
     if (stat.isDirectory()) return
 
@@ -237,7 +237,7 @@ class ServeStatic {
   }
 
   async #stream (req, res, fullPath, result) {
-    const readStream = fs.createReadStream(fullPath, result.options)
+    const readStream = jetpack.createReadStream(fullPath, result.options)
 
     readStream.on('error', error => {
       readStream.destroy()
