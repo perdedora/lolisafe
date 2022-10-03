@@ -607,6 +607,8 @@ self.generateZip = async (req, res) => {
     .where('albumid', album.id)
   if (files.length === 0) {
     logger.log(`Finished zip task for album: ${identifier} (no files).`)
+    // Remove album ZIP if it exists
+    await jetpack.removeAsync(path.join(paths.zips, `${identifier}.zip`))
     const clientErr = new ClientError('There are no files in the album.', { statusCode: 200 })
     self.zipEmitters.get(identifier).emit('done', null, null, clientErr)
     throw clientErr
