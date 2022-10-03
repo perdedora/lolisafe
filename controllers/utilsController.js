@@ -3,8 +3,9 @@ const AbortController = require('abort-controller')
 const fastq = require('fastq')
 const fetch = require('node-fetch')
 const ffmpeg = require('fluent-ffmpeg')
-const MarkdownIt = require('markdown-it')
+const jetpack = require('fs-jetpack')
 const knex = require('knex')
+const MarkdownIt = require('markdown-it')
 const path = require('path')
 const sharp = require('sharp')
 const si = require('systeminformation')
@@ -456,18 +457,15 @@ self.generateThumbs = async (name, extname, force) => {
 
   try {
     // Check if thumbnail already exists
-    try {
-      const lstat = await paths.lstat(thumbname)
-      if (lstat.isSymbolicLink()) {
+    const stat = await jetpack.inspectAsync(thumbname)
+    if (stat) {
+      if (stat.type === 'symlink') {
         // Unlink if symlink (should be symlink to the placeholder)
-        await paths.unlink(thumbname)
+        await jetpack.removeAsync(thumbname)
       } else if (!force) {
         // Continue only if it does not exist, unless forced to
         return true
       }
-    } catch (error) {
-      // Re-throw non-ENOENT error
-      if (error.code !== 'ENOENT') throw error
     }
 
     // Full path to input file
@@ -542,15 +540,10 @@ self.generateThumbs = async (name, extname, force) => {
           // Sometimes FFMPEG would throw errors but actually somehow succeeded in making the thumbnails
           // (this could be a fallback mechanism of fluent-ffmpeg library instead)
           // So instead we check if the thumbnail exists to really make sure
-          try {
-            await paths.lstat(thumbname)
+          if (await jetpack.existsAsync(thumbname)) {
             return true
-          } catch (err) {
-            if (err.code === 'ENOENT') {
-              throw error || new Error('FFMPEG exited with empty output file')
-            } else {
-              throw error || err
-            }
+          } else {
+            throw error || new Error('FFMPEG exited with empty output file')
           }
         })
     } else {
@@ -558,12 +551,12 @@ self.generateThumbs = async (name, extname, force) => {
     }
   } catch (error) {
     logger.error(`[${name}]: generateThumbs(): ${error.toString().trim()}`)
+    await jetpack.removeAsync(thumbname) // try to unlink incomplete thumbs first
     try {
-      await paths.unlink(thumbname).catch(() => {}) // try to unlink incomplete thumbs first
-      await paths.symlink(paths.thumbPlaceholder, thumbname)
+      await jetpack.symlinkAsync(paths.thumbPlaceholder, thumbname)
       return true
     } catch (err) {
-      logger.error(err)
+      logger.error(`[${name}]: generateThumbs(): ${err.toString().trim()}`)
       return false
     }
   }
@@ -575,21 +568,24 @@ self.stripTags = async (name, extname) => {
   extname = extname.toLowerCase()
   if (self.stripTagsBlacklistedExts.includes(extname)) return false
 
-  const fullpath = path.join(paths.uploads, name)
-  let tmpfile, isError
+  const fullPath = path.join(paths.uploads, name)
+  let tmpPath
+  let isError
 
   try {
     if (self.imageExts.includes(extname)) {
-      tmpfile = path.join(paths.uploads, `tmp-${name}`)
-      await paths.rename(fullpath, tmpfile)
-      await sharp(tmpfile)
-        .toFile(fullpath)
+      const tmpName = `tmp-${name}`
+      tmpPath = path.join(paths.uploads, tmpName)
+      await jetpack.renameAsync(fullPath, tmpName)
+      await sharp(tmpPath)
+        .toFile(fullPath)
     } else if (config.uploads.stripTags.video && self.videoExts.includes(extname)) {
-      tmpfile = path.join(paths.uploads, `tmp-${name}`)
-      await paths.rename(fullpath, tmpfile)
+      const tmpName = `tmp-${name}`
+      tmpPath = path.join(paths.uploads, tmpName)
+      await jetpack.renameAsync(fullPath, tmpName)
       await new Promise((resolve, reject) => {
-        ffmpeg(tmpfile)
-          .output(fullpath)
+        ffmpeg(tmpPath)
+          .output(fullPath)
           .outputOptions([
             // Experimental.
             '-c copy',
@@ -609,14 +605,8 @@ self.stripTags = async (name, extname) => {
     isError = true
   }
 
-  if (tmpfile) {
-    try {
-      await paths.unlink(tmpfile)
-    } catch (error) {
-      if (error.code !== 'ENOENT') {
-        logger.error(`[${name}]: stripTags(): ${error.toString().trim()}`)
-      }
-    }
+  if (tmpPath) {
+    await jetpack.removeAsync(tmpPath)
   }
 
   if (isError) {
@@ -627,23 +617,13 @@ self.stripTags = async (name, extname) => {
 }
 
 self.unlinkFile = async (filename, predb) => {
-  try {
-    await paths.unlink(path.join(paths.uploads, filename))
-  } catch (error) {
-    // Re-throw non-ENOENT error
-    if (error.code !== 'ENOENT') throw error
-  }
+  await jetpack.removeAsync(path.join(paths.uploads, filename))
 
   const identifier = filename.split('.')[0]
   const extname = self.extname(filename, true)
 
   if (self.imageExts.includes(extname) || self.videoExts.includes(extname)) {
-    try {
-      await paths.unlink(path.join(paths.thumbs, `${identifier}.png`))
-    } catch (error) {
-      // Re-throw non-ENOENT error
-      if (error.code !== 'ENOENT') throw error
-    }
+    await jetpack.removeAsync(path.join(paths.thumbs, `${identifier}.png`))
   }
 }
 
@@ -1151,9 +1131,10 @@ const generateStats = async (req, res) => {
         if (album.public) stats[data.title].Public++
       }
 
-      await paths.readdir(paths.zips).then(files => {
+      const files = await jetpack.listAsync(paths.zips)
+      if (Array.isArray(files)) {
         stats[data.title]['ZIP Generated'] = files.length
-      }).catch(() => {})
+      }
 
       stats[data.title]['Files in albums'] = await self.db.table('files')
         .whereIn('albumid', activeAlbums)
