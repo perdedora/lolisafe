@@ -1,4 +1,4 @@
-const paths = require('./../controllers/pathsController')
+const jetpack = require('fs-jetpack')
 const perms = require('./../controllers/permissionController')
 const config = require('./../config')
 
@@ -22,14 +22,9 @@ const map = {
 
 ;(async () => {
   if (['better-sqlite3', 'sqlite3'].includes(config.database.client)) {
-    try {
-      await paths.access(config.database.connection.filename)
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        console.log('Sqlite3 database file missing. Assumes first install, migration skipped.')
-        process.exit(0)
-      }
-      throw err
+    if (!await jetpack.existsAsync(config.database.connection.filename)) {
+      console.log('Sqlite3 database file missing. Assumes first install, migration skipped.')
+      process.exit(0)
     }
   }
 
