@@ -1,6 +1,6 @@
 const jetpack = require('fs-jetpack')
 const perms = require('./../controllers/permissionController')
-const config = require('./utils/ConfigManager')
+const config = require('./../controllers/utils/ConfigManager')
 
 const map = {
   files: {
