@@ -10,6 +10,7 @@ const paths = require('./pathsController')
 const perms = require('./permissionController')
 const utils = require('./utilsController')
 const ClientError = require('./utils/ClientError')
+const ScannerManager = require('./utils/ScannerManager')
 const ServerError = require('./utils/ServerError')
 const config = require('./utils/ConfigManager')
 const logger = require('./../logger')
@@ -520,8 +521,8 @@ self.actuallyUpload = async (req, res, data = {}) => {
 
   const filesData = req.files
 
-  if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, filesData)
+  if (ScannerManager.instance) {
+    const scanResult = await self.scanFiles(req.locals.user, filesData)
     if (scanResult) {
       throw new ClientError(scanResult)
     }
@@ -733,8 +734,8 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
     throw error
   })
 
-  if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, filesData)
+  if (ScannerManager.instance) {
+    const scanResult = await self.scanFiles(req.locals.user, filesData)
     if (scanResult) {
       throw new ClientError(scanResult)
     }
@@ -856,8 +857,8 @@ self.actuallyFinishChunks = async (req, res, files) => {
     })
   }))
 
-  if (utils.scan.instance) {
-    const scanResult = await self.scanFiles(req, filesData)
+  if (ScannerManager.instance) {
+    const scanResult = await self.scanFiles(req.locals.user, filesData)
     if (scanResult) {
       throw new ClientError(scanResult)
     }
@@ -891,7 +892,7 @@ self.cleanUpChunks = async uuid => {
 /** Virus scanning (ClamAV) */
 
 self.assertScanUserBypass = (user, filenames) => {
-  if (!user || !utils.scan.groupBypass) {
+  if (!user || !ScannerManager.groupBypass) {
     return false
   }
 
@@ -899,8 +900,8 @@ self.assertScanUserBypass = (user, filenames) => {
     filenames = [filenames]
   }
 
-  logger.debug(`[ClamAV]: ${filenames.join(', ')}: Skipped, uploaded by ${user.username} (${utils.scan.groupBypass})`)
-  return perms.is(user, utils.scan.groupBypass)
+  logger.debug(`[ClamAV]: ${filenames.join(', ')}: Skipped, uploaded by ${user.username} (${ScannerManager.groupBypass})`)
+  return perms.is(user, ScannerManager.groupBypass)
 }
 
 self.assertScanFileBypass = data => {
@@ -909,22 +910,22 @@ self.assertScanFileBypass = data => {
   }
 
   const extname = data.extname || utils.extname(data.filename)
-  if (utils.scan.whitelistExtensions && utils.scan.whitelistExtensions.includes(extname)) {
+  if (ScannerManager.whitelistExtensions && ScannerManager.whitelistExtensions.includes(extname)) {
     logger.debug(`[ClamAV]: ${data.filename}: Skipped, extension whitelisted`)
     return true
   }
 
-  if (utils.scan.maxSize && data.size !== undefined && data.size > utils.scan.maxSize) {
-    logger.debug(`[ClamAV]: ${data.filename}: Skipped, size ${data.size} > ${utils.scan.maxSize}`)
+  if (ScannerManager.maxSize && data.size !== undefined && data.size > ScannerManager.maxSize) {
+    logger.debug(`[ClamAV]: ${data.filename}: Skipped, size ${data.size} > ${ScannerManager.maxSize}`)
     return true
   }
 
   return false
 }
 
-self.scanFiles = async (req, filesData) => {
+self.scanFiles = async (user, filesData) => {
   const filenames = filesData.map(file => file.filename)
-  if (self.assertScanUserBypass(req.locals.user, filenames)) {
+  if (self.assertScanUserBypass(user, filenames)) {
     return false
   }
 
@@ -934,7 +935,7 @@ self.scanFiles = async (req, filesData) => {
     if (self.assertScanFileBypass(file)) return
 
     logger.debug(`[ClamAV]: ${file.filename}: Scanning\u2026`)
-    const response = await utils.scan.instance.isInfected(file.path)
+    const response = await ScannerManager.instance.isInfected(file.path)
     if (response.isInfected) {
       logger.log(`[ClamAV]: ${file.filename}: ${response.viruses.join(', ')}`)
       foundThreats.push(...response.viruses)

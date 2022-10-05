@@ -14,6 +14,7 @@ const perms = require('./permissionController')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
 const SimpleDataStore = require('./utils/SimpleDataStore')
+const StatsManager = require('./utils/StatsManager')
 const config = require('./utils/ConfigManager')
 const logger = require('./../logger')
 
@@ -24,16 +25,6 @@ const self = {
   inspect: devmode && require('util').inspect,
 
   db: knex(config.database),
-  scan: {
-    instance: null,
-    version: null,
-    groupBypass: config.uploads.scan.groupBypass || null,
-    whitelistExtensions: (Array.isArray(config.uploads.scan.whitelistExtensions) &&
-      config.uploads.scan.whitelistExtensions.length)
-      ? config.uploads.scan.whitelistExtensions
-      : null,
-    maxSize: (parseInt(config.uploads.scan.maxSize) * 1e6) || null
-  },
   md: {
     instance: new MarkdownIt({
       // https://markdown-it.github.io/markdown-it/#MarkdownIt.new
