@@ -707,7 +707,7 @@ self.actuallyUploadUrls = async (req, res, data = {}) => {
 
       // Finalize other file props
       const contentType = fetchFile.headers.get('content-type')
-      file.mimetype = contentType ? contentType.split(';')[0] : 'application/octet-stream'
+      file.mimetype = (contentType && contentType.split(';')[0]) || 'application/octet-stream'
       file.size = writeStream.bytesWritten
       file.hash = hashStream
         ? hashStream.digest('hex')
