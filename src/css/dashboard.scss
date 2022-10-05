@@ -162,7 +162,11 @@ li[data-action="page-ellipsis"] {
     }
 
     &[data-action] {
-      cursor: pointer
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: dotted underline
+      }
     }
   }
 }

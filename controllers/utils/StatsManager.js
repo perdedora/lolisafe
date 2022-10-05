@@ -158,6 +158,7 @@ self.getUploadsStats = async db => {
     },
     'Mime Types': {
       value: {},
+      valueAction: 'filter-uploads-by-type',
       type: Type.DETAILED
     }
   }

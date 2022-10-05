@@ -377,6 +377,8 @@ page.domClick = event => {
       return page.filterUploads(element)
     case 'sort-uploads':
       return page.sortUploads(element)
+    case 'filter-uploads-by-type':
+      return page.filterUploadsByType(element)
     // Manage your albums
     case 'submit-album':
       return page.submitAlbum(element)
@@ -1337,12 +1339,25 @@ page.sortUploads = element => {
   }))
 }
 
+page.filterUploadsByType = element => {
+  // Wrap type in quotes if it contains whitespaces
+  const type = /\s/.test(element.innerText)
+    ? `"${element.innerText}"`
+    : element.innerText
+  page.getUploads({
+    all: true,
+    filters: `type:${type}`,
+    pageNum: 0,
+    trigger: document.querySelector('#itemManageUploads')
+  })
+}
+
 page.viewUserUploads = (id, element) => {
   const user = page.cache[id]
   if (!user) return
   element.classList.add('is-loading')
   // Wrap username in quotes if it contains whitespaces
-  const username = user.username.includes(' ')
+  const username = /\s/.test(user.username)
     ? `"${user.username}"`
     : user.username
   page.getUploads({
@@ -3161,7 +3176,7 @@ page.getStatistics = (params = {}) => {
                       ${Object.keys(value).map(type => {
                         return `
                           <tr>
-                            <td>${type}</td>
+                            <td${data.valueAction ? ` data-action="${data.valueAction}"` : ''}>${type}</td>
                             <td>${value[type]}</td>
                           </tr>
                         `
