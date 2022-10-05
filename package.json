@@ -15,12 +15,12 @@
   "license": "MIT",
   "scripts": {
     "start": "env NODE_ENV=production node ./lolisafe.js",
+    "start:reload": "env NODE_ENV=production gulp watch",
     "pm2": "env NODE_ENV=production pm2 start ./lolisafe.js",
     "lint": "gulp lint",
     "build": "gulp default",
-    "watch": "env NODE_ENV=production gulp watch",
-    "develop": "env NODE_ENV=development gulp watch",
-    "dev": "env NODE_ENV=development gulp watch",
+    "dev": "env NODE_ENV=development node ./lolisafe.js",
+    "dev:reload": "env NODE_ENV=development gulp watch",
     "migrate": "node ./scripts/migrate.js",
     "bump-versions": "node ./scripts/bump-versions.js",
     "cf-purge": "node ./scripts/cf-purge.js",
@@ -31,7 +31,7 @@
     "pull": "git pull && env NODE_ENV=production yarn",
     "stash": "git stash || true",
     "stash-pop": "git stash pop || true",
-    "full-upgrade": "rm -f ./yarn.lock && yarn"
+    "rebuild-dependencies": "rm -f ./yarn.lock && yarn"
   },
   "dependencies": {
     "abort-controller": "~3.0.0",
