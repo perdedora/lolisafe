@@ -3171,13 +3171,15 @@ page.getStatistics = (params = {}) => {
             }
 
             const data = response.data.stats[keys[i]][valKeys[j]]
-            const type = (typeof data === 'object' && data.type) || 'auto'
+            const isDataObj = typeof data === 'object' && data
+
+            const type = (isDataObj && data.type) || 'auto'
             // Skip hidden
             if (type === 'hidden') {
               continue
             }
 
-            const value = typeof data === 'object' ? data.value : data
+            const value = isDataObj ? data.value : data
             let parsed = void 0
 
             switch (type) {
@@ -3243,7 +3245,7 @@ page.getStatistics = (params = {}) => {
             }
 
             let keyAttrs = ''
-            if (typeof data === 'object' && data.action) {
+            if (isDataObj && data.action) {
               keyAttrs += ` data-action="${data.action}"`
               if (data.actionData) {
                 keyAttrs += ` data-action-data="${data.actionData}"`
