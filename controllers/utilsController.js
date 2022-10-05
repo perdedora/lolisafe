@@ -11,6 +11,7 @@ const sharp = require('sharp')
 const si = require('systeminformation')
 const paths = require('./pathsController')
 const perms = require('./permissionController')
+const Constants = require('./utils/Constants')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
 const SimpleDataStore = require('./utils/SimpleDataStore')
@@ -37,10 +38,6 @@ const self = {
   gitHash: null,
 
   idMaxTries: config.uploads.maxTries || 1,
-
-  imageExts: ['.gif', '.jpeg', '.jpg', '.png', '.svg', '.tif', '.tiff', '.webp'],
-  videoExts: ['.3g2', '.3gp', '.asf', '.avchd', '.avi', '.divx', '.evo', '.flv', '.h264', '.h265', '.hevc', '.m2p', '.m2ts', '.m4v', '.mk3d', '.mkv', '.mov', '.mp4', '.mpeg', '.mpg', '.mxf', '.ogg', '.ogv', '.ps', '.qt', '.rmvb', '.ts', '.vob', '.webm', '.wmv'],
-  audioExts: ['.flac', '.mp3', '.wav', '.wma'],
 
   stripTagsBlacklistedExts: Array.isArray(config.uploads.stripTags.blacklistExtensions)
     ? config.uploads.stripTags.blacklistExtensions
@@ -290,8 +287,8 @@ const cloudflarePurgeCacheQueue = cloudflareAuth && fastq.promise(async chunk =>
 
 self.mayGenerateThumb = extname => {
   extname = extname.toLowerCase()
-  return (config.uploads.generateThumbs.image && self.imageExts.includes(extname)) ||
-    (config.uploads.generateThumbs.video && self.videoExts.includes(extname))
+  return (config.uploads.generateThumbs.image && Constants.IMAGE_EXTS.includes(extname)) ||
+    (config.uploads.generateThumbs.video && Constants.VIDEO_EXTS.includes(extname))
 }
 
 // Expand if necessary (should be case-insensitive)
@@ -455,7 +452,7 @@ self.generateThumbs = async (name, extname, force) => {
     const input = path.join(paths.uploads, name)
 
     // If image extension
-    if (self.imageExts.includes(extname)) {
+    if (Constants.IMAGE_EXTS.includes(extname)) {
       const resizeOptions = {
         width: self.thumbsSize,
         height: self.thumbsSize,
@@ -489,7 +486,7 @@ self.generateThumbs = async (name, extname, force) => {
           })
           .toFile(thumbname)
       }
-    } else if (self.videoExts.includes(extname)) {
+    } else if (Constants.VIDEO_EXTS.includes(extname)) {
       const metadata = await self.ffprobe(input)
 
       const duration = parseInt(metadata.format.duration)
@@ -556,13 +553,13 @@ self.stripTags = async (name, extname) => {
   let isError
 
   try {
-    if (self.imageExts.includes(extname)) {
+    if (Constants.IMAGE_EXTS.includes(extname)) {
       const tmpName = `tmp-${name}`
       tmpPath = path.join(paths.uploads, tmpName)
       await jetpack.renameAsync(fullPath, tmpName)
       await sharp(tmpPath)
         .toFile(fullPath)
-    } else if (config.uploads.stripTags.video && self.videoExts.includes(extname)) {
+    } else if (config.uploads.stripTags.video && Constants.VIDEO_EXTS.includes(extname)) {
       const tmpName = `tmp-${name}`
       tmpPath = path.join(paths.uploads, tmpName)
       await jetpack.renameAsync(fullPath, tmpName)
@@ -605,7 +602,7 @@ self.unlinkFile = async (filename, predb) => {
   const identifier = filename.split('.')[0]
   const extname = self.extname(filename, true)
 
-  if (self.imageExts.includes(extname) || self.videoExts.includes(extname)) {
+  if (Constants.IMAGE_EXTS.includes(extname) || Constants.VIDEO_EXTS.includes(extname)) {
     await jetpack.removeAsync(path.join(paths.thumbs, `${identifier}.png`))
   }
 }
