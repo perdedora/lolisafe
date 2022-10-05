@@ -3171,14 +3171,14 @@ page.getStatistics = (params = {}) => {
             }
 
             const data = response.data.stats[keys[i]][valKeys[j]]
-            const type = typeof data === 'object' ? data.type : 'auto'
+            const type = (typeof data === 'object' && data.type) || 'auto'
             // Skip hidden
             if (type === 'hidden') {
               continue
             }
 
             const value = typeof data === 'object' ? data.value : data
-            let parsed
+            let parsed = void 0
 
             switch (type) {
               case 'byte':
@@ -3201,10 +3201,18 @@ page.getStatistics = (params = {}) => {
                   <table class="table is-narrow is-fullwidth is-hoverable">
                     <tbody>
                       ${Object.keys(value).map(type => {
+                        let detailedValue = void 0
+                        switch (typeof value[type]) {
+                          case 'number':
+                            detailedValue = value[type].toLocaleString()
+                            break
+                          default:
+                            detailedValue = value[type]
+                        }
                         return `
                           <tr>
                             <th${data.valueAction ? ` data-action="${data.valueAction}"` : ''}>${type}</th>
-                            <td>${value[type]}</td>
+                            <td>${detailedValue}</td>
                           </tr>
                         `
                       }).join('\n')}
