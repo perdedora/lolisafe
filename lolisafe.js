@@ -256,6 +256,9 @@ safe.use('/api', api)
     utils.versionStrings = {}
     if (config.cacheControl) {
       const versions = require('./src/versions')
+      if (versions['1'] && utils.devmode) {
+        versions['1'] = String(Math.ceil(Date.now() / 1000))
+      }
       for (const type in versions) {
         utils.versionStrings[type] = `?_=${versions[type]}`
       }
