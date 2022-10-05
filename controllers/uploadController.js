@@ -1208,13 +1208,14 @@ self.list = async (req, res) => {
     queries: {
       exclude: {}
     },
-    typeIs: [
-      'image',
-      'video',
-      'audio'
-    ],
+    typeIs: {
+      image: Constants.IMAGE_EXTS,
+      video: Constants.VIDEO_EXTS,
+      audio: Constants.AUDIO_EXTS
+    },
     flags: {}
   }
+  const typeIsKeys = Object.keys(filterObj.typeIs)
 
   const sortObj = {
     // Cast columns to specific type if they are stored differently
@@ -1536,33 +1537,50 @@ self.list = async (req, res) => {
       delete filterObj.queries.sort
     }
 
-    // Parse is keys
-    let isKeys = 0
-    let isLast
+    // Parse type-is keys
     if (filterObj.queries.is || filterObj.queries.exclude.is) {
-      for (const type of filterObj.typeIs) {
-        const inQuery = filterObj.queries.is && filterObj.queries.is.includes(type)
-        const inExclude = filterObj.queries.exclude.is && filterObj.queries.exclude.is.includes(type)
+      const types = []
 
-        // Prioritize exclude keys when both types found
-        if (inQuery || inExclude) {
-          filterObj.flags[`is${type}`] = inExclude ? false : inQuery
-          if (isLast !== undefined && isLast !== filterObj.flags[`is${type}`]) {
-            throw new ClientError('Cannot mix inclusion and exclusion type-is keys.')
-          }
-          isKeys++
-          isLast = filterObj.flags[`is${type}`]
+      if (filterObj.queries.is) {
+        filterObj.queries.is = filterObj.queries.is.map(type => type.toLowerCase())
+        types.push(...filterObj.queries.is)
+      }
+      if (filterObj.queries.exclude.is) {
+        filterObj.queries.exclude.is = filterObj.queries.exclude.is.map(type => type.toLowerCase())
+        types.push(...filterObj.queries.exclude.is)
+      }
+
+      let isKeys = 0
+      let isLast
+
+      for (const type of types) {
+        if (!typeIsKeys.includes(type)) {
+          throw new ClientError(`Found invalid type-is key: ${type}.`)
         }
+
+        if (filterObj.queries.is && filterObj.queries.is.includes(type)) {
+          filterObj.flags[`is${type}`] = true
+        } else {
+          filterObj.flags[`is${type}`] = false
+        }
+
+        isKeys++
+
+        if (isLast === undefined) {
+          isLast = filterObj.flags[`is${type}`]
+        } else if (filterObj.flags[`is${type}`] !== isLast) {
+          throw new ClientError('Cannot mix inclusion and exclusion type-is keys.')
+        }
+      }
+
+      // Regular user threshold check
+      if (!ismoderator && isKeys > MAX_IS_KEYS) {
+        throw new ClientError(`Users are only allowed to use ${MAX_IS_KEYS} type-is key${MAX_IS_KEYS === 1 ? '' : 's'} at a time.`)
       }
 
       // Delete keys to avoid unexpected behavior
       delete filterObj.queries.is
       delete filterObj.queries.exclude.is
-    }
-
-    // Regular user threshold check
-    if (!ismoderator && isKeys > MAX_IS_KEYS) {
-      throw new ClientError(`Users are only allowed to use ${MAX_IS_KEYS} type-is key${MAX_IS_KEYS === 1 ? '' : 's'} at a time.`)
     }
   }
 
@@ -1670,7 +1688,7 @@ self.list = async (req, res) => {
 
     // Then, refine using type-is flags
     this.andWhere(function () {
-      for (const type of filterObj.typeIs) {
+      for (const type of typeIsKeys) {
         let func
         let operator
         if (filterObj.flags[`is${type}`] === true) {
@@ -1682,7 +1700,7 @@ self.list = async (req, res) => {
         }
 
         if (func) {
-          for (const pattern of utils[`${type}Exts`].map(ext => `%${ext}`)) {
+          for (const pattern of filterObj.typeIs[type].map(ext => `%${ext}`)) {
             this[func]('name', operator, pattern)
           }
         }
