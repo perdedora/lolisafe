@@ -167,7 +167,11 @@ self.getUploadsStats = async db => {
       action: 'filter-uploads-with',
       actionData: '-is:image -is:video -is:audio'
     },
-    Temporary: 0,
+    Temporary: {
+      value: 0,
+      action: 'filter-uploads-with',
+      actionData: 'expiry:>0'
+    },
     'Size in DB': {
       value: 0,
       type: Type.BYTE
