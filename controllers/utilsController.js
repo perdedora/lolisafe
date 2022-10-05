@@ -679,8 +679,8 @@ self.purgeCloudflareCache = async (names, uploads, thumbs) => {
     return [{ success: false, files: [], errors }]
   }
 
-  let domain = self.conf.domain
-  if (!uploads) domain = self.conf.homeDomain
+  let domain = config.domain
+  if (!uploads) domain = config.homeDomain
 
   const thumbNames = []
   names = names.map(name => {
