@@ -763,7 +763,7 @@ page.getUploads = (params = {}) => {
         div.className = 'image-container column'
         div.dataset.id = upload.id
 
-        if (upload.thumb === undefined) {
+        if (typeof upload.thumb === 'undefined') {
           div.innerHTML = `<a class="image" href="${upload.file}" target="_blank"><h1 class="title">${upload.extname || 'N/A'}</h1></a>`
         } else {
           div.innerHTML = `<a class="image" href="${upload.file}" target="_blank"><img alt="${upload.name}" data-src="${upload.thumb}"/></a>`
@@ -934,7 +934,7 @@ page.setUploadsView = (view, element) => {
 
   if (view === 'list') {
     delete localStorage[lsKeys.viewType[page.currentView]]
-    page.views[page.currentView].type = undefined
+    page.views[page.currentView].type = void 0
   } else {
     localStorage[lsKeys.viewType[page.currentView]] = view
     page.views[page.currentView].type = view
@@ -3127,7 +3127,7 @@ page.getStatistics = (params = {}) => {
               case 'byteUsage': {
                 if (typeof value === 'object') {
                   // Reasoning: https://github.com/sebhildebrandt/systeminformation/issues/464#issuecomment-756406053
-                  const totalForPercentage = value.available !== undefined
+                  const totalForPercentage = typeof value.available !== 'undefined'
                     ? (value.used + value.available)
                     : value.total
                   parsed = `${page.getPrettyBytes(value.used)} / ${page.getPrettyBytes(value.total)} (${(value.used / totalForPercentage * 100).toFixed(2)}%)`

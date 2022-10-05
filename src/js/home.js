@@ -850,7 +850,7 @@ page.prepareUploadConfig = () => {
             default: page.fileIdentifierLength.default,
             round: true
           }
-        : undefined,
+        : void 0,
       help: true, // true means auto-generated, for number-based configs only
       disabled: fileIdentifierLength && page.fileIdentifierLength.force
     },
@@ -979,9 +979,9 @@ page.prepareUploadConfig = () => {
       } else {
         const stored = localStorage[lsKeys[key]]
         if (Array.isArray(conf.select)) {
-          value = conf.select.find(sel => sel.value === stored)
-            ? stored
-            : undefined
+          if (conf.select.find(sel => sel.value === stored)) {
+            value = stored
+          }
         } else {
           value = stored
         }
