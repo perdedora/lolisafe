@@ -1191,6 +1191,10 @@ page.uploadFiltersHelp = element => {
     Negation sign works for this key as well.
     Mixing inclusion and exclusion is not allowed (i.e. <code>is:image -is:video</code>), since the second key will be redundant.
 
+    Alternatively, you can filter by their actual mime types using <b>type</b> keys.
+    For example, <code>type:image/jpeg</code>, <code>type:video/mp4</code>.
+    Negation sign works for this key as well.
+
     Any leftover keywords which do not use keys (non-keyed keywords) will be matched against the matches' randomly generated and original names.
     Excluding certain keywords is also supported by adding negation sign before the keywords.
 
@@ -1201,6 +1205,7 @@ page.uploadFiltersHelp = element => {
       : '- Filter uploads'} using <b>date</b> key, if any.
     - Refine matches using <b>expiry</b> key, if any.
     - Refine matches using type-<b>is</b> keys, if any.
+    - Refine matches using <b>type</b> keys, if any.
     - Refine matches using ANY non-keyed keywords, if any.
     - Filter matches using ALL exclusion non-keyed keywords, if any.
     - Sort matches using <b>sort</b> keys, if any.

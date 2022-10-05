@@ -1232,6 +1232,7 @@ self.list = async (req, res) => {
     // Columns with which to use SQLite's NULLS LAST option
     nullsLast: [
       'userid',
+      'type',
       'albumid',
       'expirydate',
       'ip'
@@ -1266,7 +1267,7 @@ self.list = async (req, res) => {
   }
 
   if (filters) {
-    const keywords = []
+    const keywords = ['type']
 
     // Only allow filtering by 'albumid' when not listing a specific album's uploads
     if (isNaN(albumid)) {
@@ -1705,6 +1706,23 @@ self.list = async (req, res) => {
             this[func]('name', operator, pattern)
           }
         }
+      }
+    })
+
+    // Then, refine using 'type' keys
+    this.andWhere(function () {
+      if (filterObj.queries.exclude.type) {
+        this.whereNotIn('type', filterObj.queries.exclude.type)
+      } else if (filterObj.queries.type) {
+        this.orWhereIn('type', filterObj.queries.type)
+      }
+      // ...
+      if ((filterObj.queries.exclude.type && filterObj.flags.typeNull !== false) ||
+          (filterObj.queries.type && filterObj.flags.typeNull) ||
+          (!filterObj.queries.exclude.type && !filterObj.queries.type && filterObj.flags.typeNull)) {
+        this.orWhereNull('type')
+      } else if (filterObj.flags.typeNull === false) {
+        this.whereNotNull('type')
       }
     })
 
