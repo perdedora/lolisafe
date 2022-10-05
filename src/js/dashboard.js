@@ -377,6 +377,9 @@ page.domClick = event => {
       return page.filterUploads(element)
     case 'sort-uploads':
       return page.sortUploads(element)
+    // Statistics
+    case 'filter-uploads-with':
+      return page.filterUploadsWith(element)
     case 'filter-uploads-by-type':
       return page.filterUploadsByType(element)
     // Manage your albums
@@ -1339,11 +1342,27 @@ page.sortUploads = element => {
   }))
 }
 
+page.filterUploadsWith = element => {
+  const actionData = (element.dataset.actionData || '')
+  const filtersArray = page.uniquifyUploadsFilters(actionData)
+
+  page.getUploads({
+    all: true,
+    filters: filtersArray.join(' '),
+    pageNum: 0,
+    trigger: document.querySelector('#itemManageUploads')
+  })
+}
+
 page.filterUploadsByType = element => {
+  const text = element.innerText.trim()
+  if (!text) return
+
   // Wrap type in quotes if it contains whitespaces
-  const type = /\s/.test(element.innerText)
-    ? `"${element.innerText}"`
-    : element.innerText
+  const type = /\s/.test(text)
+    ? `"${text}"`
+    : text
+
   page.getUploads({
     all: true,
     filters: `type:${type}`,
@@ -1355,11 +1374,14 @@ page.filterUploadsByType = element => {
 page.viewUserUploads = (id, element) => {
   const user = page.cache[id]
   if (!user) return
+
   element.classList.add('is-loading')
+
   // Wrap username in quotes if it contains whitespaces
   const username = /\s/.test(user.username)
     ? `"${user.username}"`
     : user.username
+
   page.getUploads({
     all: true,
     filters: `user:${username}`,
@@ -1369,9 +1391,12 @@ page.viewUserUploads = (id, element) => {
 
 page.viewAlbumUploads = (id, element) => {
   if (!page.cache[id]) return
+
   element.classList.add('is-loading')
+
   // eslint-disable-next-line compat/compat
   const all = page.currentView === 'albumsAll' && page.permissions.moderator
+
   page.getUploads({
     all,
     filters: `albumid:${id}`,
@@ -1410,7 +1435,9 @@ page.deleteUpload = id => {
 
 page.bulkDeleteUploads = () => {
   const count = page.selected[page.currentView].length
-  if (!count) return swal('An error occurred!', 'You have not selected any uploads.', 'error')
+  if (!count) {
+    return swal('An error occurred!', 'You have not selected any uploads.', 'error')
+  }
 
   page.postBulkDeleteUploads({
     all: page.currentView === 'uploadsAll',
@@ -3176,7 +3203,7 @@ page.getStatistics = (params = {}) => {
                       ${Object.keys(value).map(type => {
                         return `
                           <tr>
-                            <td${data.valueAction ? ` data-action="${data.valueAction}"` : ''}>${type}</td>
+                            <th${data.valueAction ? ` data-action="${data.valueAction}"` : ''}>${type}</th>
                             <td>${value[type]}</td>
                           </tr>
                         `
@@ -3207,9 +3234,17 @@ page.getStatistics = (params = {}) => {
                 parsed = value
             }
 
+            let keyAttrs = ''
+            if (typeof data === 'object' && data.action) {
+              keyAttrs += ` data-action="${data.action}"`
+              if (data.actionData) {
+                keyAttrs += ` data-action-data="${data.actionData}"`
+              }
+            }
+
             rows += `
               <tr>
-                <th>${valKeys[j]}</th>
+                <th${keyAttrs}>${valKeys[j]}</th$>
                 <td>${parsed}</td>
               </tr>
             `

@@ -147,10 +147,26 @@ self.getUploadsStats = async db => {
 
   const stats = {
     Total: uploads.length,
-    Images: 0,
-    Videos: 0,
-    Audios: 0,
-    Others: 0,
+    Images: {
+      value: 0,
+      action: 'filter-uploads-with',
+      actionData: 'is:image'
+    },
+    Videos: {
+      value: 0,
+      action: 'filter-uploads-with',
+      actionData: 'is:video'
+    },
+    Audios: {
+      value: 0,
+      action: 'filter-uploads-with',
+      actionData: 'is:audio'
+    },
+    Others: {
+      value: 0,
+      action: 'filter-uploads-with',
+      actionData: '-is:image -is:video -is:audio'
+    },
     Temporary: 0,
     'Size in DB': {
       value: 0,
@@ -165,13 +181,13 @@ self.getUploadsStats = async db => {
 
   for (const upload of uploads) {
     if (self.imageExtsRegex.test(upload.name)) {
-      stats.Images++
+      stats.Images.value++
     } else if (self.videoExtsRegex.test(upload.name)) {
-      stats.Videos++
+      stats.Videos.value++
     } else if (self.audioExtsRegex.test(upload.name)) {
-      stats.Audios++
+      stats.Audios.value++
     } else {
-      stats.Others++
+      stats.Others.value++
     }
 
     if (upload.expirydate !== null) {
