@@ -140,8 +140,8 @@ li[data-action="page-ellipsis"] {
   }
 }
 
-#statistics tr *:nth-child(1) {
-  width: 50%
+#statistics tr > *:nth-child(1) {
+  min-width: 33.3%
 }
 
 .expirydate {

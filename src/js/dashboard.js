@@ -3103,23 +3103,36 @@ page.getStatistics = (params = {}) => {
     let content = ''
     const keys = Object.keys(response.data.stats)
     for (let i = 0; i < keys.length; i++) {
+      const meta = []
       let rows = ''
+
       if (!response.data.stats[keys[i]]) {
         rows += `
           <tr>
-            <td>Generating, please try again later\u2026</td>
+            <td>Still being generated, please try again later\u2026</td>
             <td></td>
           </tr>
         `
       } else {
         try {
           const valKeys = Object.keys(response.data.stats[keys[i]])
+
           for (let j = 0; j < valKeys.length; j++) {
+            // Skip meta
+            if (valKeys[j] === 'meta') {
+              continue
+            }
+
             const data = response.data.stats[keys[i]][valKeys[j]]
             const type = typeof data === 'object' ? data.type : 'auto'
-            const value = typeof data === 'object' ? data.value : data
+            // Skip hidden
+            if (type === 'hidden') {
+              continue
+            }
 
+            const value = typeof data === 'object' ? data.value : data
             let parsed
+
             switch (type) {
               case 'byte':
                 parsed = page.getPrettyBytes(value)
@@ -3136,6 +3149,22 @@ page.getStatistics = (params = {}) => {
                 }
                 break
               }
+              case 'detailed':
+                parsed = `
+                  <table class="table is-narrow is-fullwidth is-hoverable">
+                    <tbody>
+                      ${Object.keys(value).map(type => {
+                        return `
+                          <tr>
+                            <td>${type}</td>
+                            <td>${value[type]}</td>
+                          </tr>
+                        `
+                      }).join('\n')}
+                    </tbody>
+                  </table>
+                `
+                break
               case 'tempC':
                 // TODO: Unit conversion when required?
                 parsed = typeof value === 'number'
@@ -3165,13 +3194,29 @@ page.getStatistics = (params = {}) => {
               </tr>
             `
           }
+
+          const _meta = response.data.stats[keys[i]].meta
+          if (typeof _meta !== 'undefined') {
+            // generatedOn
+            if (typeof _meta.generatedOn !== 'undefined') {
+              meta.push(`Generated on ${page.getPrettyDate(new Date(_meta.generatedOn))}`)
+            }
+            // maxAge
+            if (typeof _meta.maxAge === 'number') {
+              if (_meta.maxAge >= 0) {
+                meta.push(`(${_meta.maxAge / 1000}s)`)
+              } else {
+                meta.push('(auto)')
+              }
+            }
+          }
         } catch (error) {
           rows = `
-              <tr>
-                <td>Error parsing response. Try again?</td>
-                <td></td>
-              </tr>
-            `
+            <tr>
+              <td>Error parsing response. Try again?</td>
+              <td></td>
+            </tr>
+          `
           page.onError(error)
         }
       }
@@ -3182,7 +3227,7 @@ page.getStatistics = (params = {}) => {
             <thead>
               <tr>
                 <th class="capitalize">${keys[i]}</th>
-                <td></td>
+                <td class="has-text-right">${meta.join(' ')}</td>
               </tr>
             </thead>
             <tbody>
