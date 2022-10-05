@@ -179,6 +179,9 @@ self.getUploadsStats = async db => {
     }
   }
 
+  // Mime types container
+  const types = {}
+
   for (const upload of uploads) {
     if (self.imageExtsRegex.test(upload.name)) {
       stats.Images.value++
@@ -196,12 +199,22 @@ self.getUploadsStats = async db => {
 
     stats['Size in DB'].value += parseInt(upload.size)
 
-    if (stats['Mime Types'].value[upload.type] === undefined) {
-      stats['Mime Types'].value[upload.type] = 0
+    if (types[upload.type] === undefined) {
+      types[upload.type] = 0
     }
 
-    stats['Mime Types'].value[upload.type]++
+    types[upload.type]++
   }
+
+  // Sort mime types by count, and alphabetical ordering of the types
+  stats['Mime Types'].value = Object.keys(types)
+    .sort((a, b) => {
+      return types[b] - types[a] || a.localeCompare(b)
+    })
+    .reduce((acc, type) => {
+      acc[type] = types[type]
+      return acc
+    }, {})
 
   return stats
 }
