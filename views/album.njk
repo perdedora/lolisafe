@@ -4,7 +4,7 @@
 {% set metaDesc = album.description | striptags | truncate(200, true, '…') %}
 {% set metaUrl = '/' + album.url %}
 
-{% set fileRoot = utils.conf.domain %}
+{% set fileRoot = config.domain %}
 {% set metaImage = fileRoot + '/' + album.thumb %}
 
 {% extends "_layout.njk" %}

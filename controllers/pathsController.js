@@ -1,6 +1,6 @@
 const jetpack = require('fs-jetpack')
 const path = require('path')
-const config = require('./../config')
+const config = require('./utils/ConfigManager')
 
 const self = {}
 

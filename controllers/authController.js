@@ -7,7 +7,7 @@ const perms = require('./permissionController')
 const tokens = require('./tokenController')
 const utils = require('./utilsController')
 const ClientError = require('./utils/ClientError')
-const config = require('./../config')
+const config = require('./utils/ConfigManager')
 
 // Don't forget to update min/max length of text inputs in auth.njk
 // when changing these values.

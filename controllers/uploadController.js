@@ -11,7 +11,7 @@ const perms = require('./permissionController')
 const utils = require('./utilsController')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
-const config = require('./../config')
+const config = require('./utils/ConfigManager')
 const logger = require('./../logger')
 
 /** Deprecated config options */
@@ -1114,7 +1114,7 @@ self.sendUploadResponse = async (req, res, stored) => {
       const map = {
         name: entry.file.name,
         original: entry.file.original,
-        url: `${utils.conf.domain ? `${utils.conf.domain}/` : ''}${entry.file.name}`,
+        url: `${config.domain ? `${config.domain}/` : ''}${entry.file.name}`,
         hash: entry.file.hash,
         size: Number(entry.file.size)
       }
@@ -1132,7 +1132,7 @@ self.sendUploadResponse = async (req, res, stored) => {
       // If uploaded by user, add delete URL (intended for ShareX and its derivatives)
       // Homepage uploader will not use this (use dashboard instead)
       if (req.locals.user) {
-        map.deleteUrl = `${utils.conf.homeDomain || ''}/file/${entry.file.name}?delete`
+        map.deleteUrl = `${config.homeDomain || ''}/file/${entry.file.name}?delete`
       }
 
       if (entry.repeated) {
@@ -1185,7 +1185,7 @@ self.list = async (req, res) => {
   }
 
   const albumid = req.path_parameters && Number(req.path_parameters.albumid)
-  const basedomain = utils.conf.domain
+  const basedomain = config.domain
 
   // Thresholds for regular users (usergroups lower than moderator)
   const MAX_WILDCARDS_IN_KEY = 2

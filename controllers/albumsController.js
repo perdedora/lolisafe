@@ -11,7 +11,7 @@ const utils = require('./utilsController')
 const ServeStatic = require('./handlers/ServeStatic')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
-const config = require('./../config')
+const config = require('./utils/ConfigManager')
 const logger = require('./../logger')
 
 const self = {
@@ -25,7 +25,7 @@ const self = {
 
 /** Preferences */
 
-const homeDomain = utils.conf.homeDomain || utils.conf.domain
+const homeDomain = config.homeDomain || config.domain
 
 const albumsPerPage = config.dashboard
   ? Math.max(Math.min(config.dashboard.albumsPerPage || 0, 100), 1)
@@ -491,14 +491,14 @@ self.get = async (req, res) => {
 
   for (const file of files) {
     if (req.locals.upstreamCompat) {
-      file.url = `${utils.conf.domain}/${file.name}`
+      file.url = `${config.domain}/${file.name}`
     } else {
-      file.file = `${utils.conf.domain}/${file.name}`
+      file.file = `${config.domain}/${file.name}`
     }
 
     const extname = utils.extname(file.name)
     if (utils.mayGenerateThumb(extname)) {
-      file.thumb = `${utils.conf.domain}/thumbs/${file.name.slice(0, -extname.length)}.png`
+      file.thumb = `${config.domain}/thumbs/${file.name.slice(0, -extname.length)}.png`
       if (req.locals.upstreamCompat) {
         file.thumbSquare = file.thumb
       }

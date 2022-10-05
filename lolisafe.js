@@ -25,7 +25,6 @@ try {
 const fs = require('fs')
 const helmet = require('helmet')
 const HyperExpress = require('hyper-express')
-const NodeClam = require('clamscan')
 
 // Check required config files
 const configFiles = ['config.js', 'views/_globals.njk']
@@ -39,9 +38,8 @@ for (const _file of configFiles) {
   }
 }
 
-// Config files
-const config = require('./config')
-const versions = require('./src/versions')
+// ConfigManager
+const config = require('./controllers/utils/ConfigManager')
 
 // lolisafe
 logger.log('Starting lolisafe\u2026')
@@ -64,6 +62,9 @@ const ServeStaticQuick = require('./controllers/middlewares/ServeStaticQuick')
 
 // Handlers
 const ServeStatic = require('./controllers/handlers/ServeStatic')
+
+// Modules
+const ScannerManager = require('./controllers/utils/ScannerManager')
 
 // Routes
 const album = require('./routes/album')
@@ -211,14 +212,16 @@ if (config.cacheControl) {
 }
 
 // Init serve static middlewares for static assets
-const ServeStaticClass = utils.conf.disableServeStaticQuick
-  ? ServeLiveDirectory
-  : ServeStaticQuick
+const ServeStaticClass = config.useServeStaticQuick
+  ? ServeStaticQuick
+  : ServeLiveDirectory
+
 // Static assets in /dist directory
 const serveStaticDistInstance = new ServeStaticClass(paths.dist, {
   setHeaders: setHeadersForStaticAssets
 })
 safe.use(serveStaticDistInstance.middleware)
+
 // Static assets in /public directory
 const serveStaticPublicInstance = new ServeStaticClass(paths.public, {
   setHeaders: setHeadersForStaticAssets
@@ -252,6 +255,7 @@ safe.use('/api', api)
     // Re-map version strings if cache control is enabled (safe.fiery.me)
     utils.versionStrings = {}
     if (config.cacheControl) {
+      const versions = require('./src/versions')
       for (const type in versions) {
         utils.versionStrings[type] = `?_=${versions[type]}`
       }
@@ -326,17 +330,6 @@ safe.use('/api', api)
       logger.log(`Git commit: ${utils.gitHash}`)
     }
 
-    // ClamAV scanner
-    if (config.uploads.scan && config.uploads.scan.enabled) {
-      if (!config.uploads.scan.clamOptions) {
-        logger.error('Missing object config.uploads.scan.clamOptions (check config.sample.js)')
-        process.exit(1)
-      }
-      utils.scan.instance = await new NodeClam().init(config.uploads.scan.clamOptions)
-      utils.scan.version = await utils.scan.instance.getVersion().then(s => s.trim())
-      logger.log(`Connection established with ${utils.scan.version}`)
-    }
-
     // Await all ServeLiveDirectory and ServeStaticQuick instances
     await Promise.all([
       serveStaticDistInstance.ready(),
@@ -344,9 +337,13 @@ safe.use('/api', api)
       serveLiveDirectoryCustomPagesInstance.ready()
     ])
 
+    // Init modules
+    // ClamAV scanner
+    await ScannerManager.init()
+
     // Binds Express to port
-    await safe.listen(utils.conf.port)
-    logger.log(`lolisafe started on port ${utils.conf.port}`)
+    await safe.listen(config.port)
+    logger.log(`lolisafe started on port ${config.port}`)
 
     // Cache control (safe.fiery.me)
     // Purge Cloudflare cache

@@ -2,7 +2,7 @@ const { Router } = require('hyper-express')
 const routes = new Router()
 const upload = require('./../controllers/uploadController')
 const utils = require('./../controllers/utilsController')
-const config = require('./../config')
+const config = require('./../controllers/utils/ConfigManager')
 
 routes.get('/nojs', async (req, res) => {
   return res.render('nojs', {

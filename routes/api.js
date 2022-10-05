@@ -5,7 +5,7 @@ const auth = require('./../controllers/authController')
 const tokens = require('./../controllers/tokenController')
 const upload = require('./../controllers/uploadController')
 const utils = require('./../controllers/utilsController')
-const config = require('./../config')
+const config = require('./../controllers/utils/ConfigManager')
 
 routes.get('/check', async (req, res) => {
   const obj = {

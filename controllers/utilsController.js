@@ -14,7 +14,7 @@ const perms = require('./permissionController')
 const ClientError = require('./utils/ClientError')
 const ServerError = require('./utils/ServerError')
 const SimpleDataStore = require('./utils/SimpleDataStore')
-const config = require('./../config')
+const config = require('./utils/ConfigManager')
 const logger = require('./../logger')
 
 const devmode = process.env.NODE_ENV === 'development'
@@ -24,13 +24,6 @@ const self = {
   inspect: devmode && require('util').inspect,
 
   db: knex(config.database),
-  conf: {
-    // Allow some config options to be overriden via env vars
-    port: process.env.PORT || config.port,
-    domain: process.env.DOMAIN || config.domain,
-    homeDomain: process.env.HOME_DOMAIN || config.homeDomain,
-    disableServeStaticQuick: process.env.SERVE_STATIC_QUICK === '0'
-  },
   scan: {
     instance: null,
     version: null,
@@ -151,8 +144,7 @@ if (typeof config.uploads.retentionPeriods === 'object' &&
       self.retentions.enabled = true
     }
   }
-} else if (Array.isArray(config.uploads.temporaryUploadAges) &&
-  config.uploads.temporaryUploadAges.length) {
+} else if (Array.isArray(config.uploads.temporaryUploadAges) && config.uploads.temporaryUploadAges.length) {
   self.retentions.periods._ = config.uploads.temporaryUploadAges
     .filter((v, i, a) => Number.isFinite(v) && v >= 0)
   self.retentions.default._ = self.retentions.periods._[0]
