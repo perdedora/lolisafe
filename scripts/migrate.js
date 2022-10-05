@@ -65,14 +65,27 @@ const map = {
       })
   }
 
-  const files = await db.table('files')
+  const filesOutdatedSize = await db.table('files')
     .where('size', 'like', '%.0')
-  if (files.length) {
-    console.log(`Found ${files.length} files with outdated "size" field, converting\u2026`)
-    for (const file of files) {
+  if (filesOutdatedSize.length) {
+    console.log(`Found ${filesOutdatedSize.length} files with outdated "size" field, converting\u2026`)
+    for (const file of filesOutdatedSize) {
       const size = file.size.replace(/\.0$/, '')
       await db.table('files')
         .update('size', size)
+        .where('id', file.id)
+      done++
+    }
+  }
+
+  const filesMissingType = await db.table('files')
+    .where('type', '')
+    .orWhereNull('type')
+  if (filesMissingType.length) {
+    console.log(`Found ${filesMissingType.length} files with invalid "type" field, converting\u2026`)
+    for (const file of filesMissingType) {
+      await db.table('files')
+        .update('type', 'application/octet-stream')
         .where('id', file.id)
       done++
     }
