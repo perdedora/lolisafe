@@ -198,7 +198,7 @@ self.getUploadsStats = async db => {
     }
 
     if (upload.expirydate !== null) {
-      stats.Temporary++
+      stats.Temporary.value++
     }
 
     stats['Size in DB'].value += parseInt(upload.size)
