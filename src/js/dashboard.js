@@ -3231,6 +3231,9 @@ page.getStatistics = (params = {}) => {
               case 'uptime':
                 parsed = page.getPrettyUptime(value)
                 break
+              case 'unavailable':
+                parsed = 'N/A'
+                break
               case 'auto':
                 switch (typeof value) {
                   case 'number':
