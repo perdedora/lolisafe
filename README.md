@@ -8,7 +8,7 @@
 
 ## Features
 
-* Powered by [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js/) & [HyperExpress](https://github.com/kartikk221/hyper-express) for a much more performant web server, due to being a Node.js binding of [uWebSockets](https://github.com/uNetworking/uWebSockets) written in C & C++.
+* Powered by [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js) & [HyperExpress](https://github.com/kartikk221/hyper-express) for a much more performant web server, due to being a Node.js binding of [uWebSockets](https://github.com/uNetworking/uWebSockets) written in C & C++.
 * Powered by [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) for performant SQLite3 database (using [Knex.js](https://knexjs.org/) for abstraction, thus support for other database engines *may* also come in the future).
 * Faster file hashing for duplicates detection by using [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) hash function.
 * ClamAV virus scanning support for Linux/OS X servers ([read more](#clamav-support)).
