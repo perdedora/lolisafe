@@ -278,7 +278,6 @@ self.getAlbumsStats = async db => {
     activeAlbums.push(album.id)
     if (album.download) stats.Downloadable++
     if (album.public) stats.Public++
-    if (album.zipGeneratedAt) stats['ZIP Generated']++
   }
 
   const files = await jetpack.listAsync(paths.zips)
