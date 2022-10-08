@@ -378,6 +378,8 @@ page.domClick = event => {
     case 'sort-uploads':
       return page.sortUploads(element)
     // Statistics
+    case 'reload-stats-category':
+      return page.reloadStatsCategory(element)
     case 'filter-uploads-with':
       return page.filterUploadsWith(element)
     case 'filter-uploads-by-type':
@@ -3129,6 +3131,166 @@ page.paginate = (totalItems, itemsPerPage, currentPage) => {
   `
 }
 
+page.buildStatisticTable = (title, stats) => {
+  const meta = []
+  let statsKey = ''
+  let rows = ''
+
+  if (!stats) {
+    rows += `
+      <tr>
+        <td>Still being generated, please try again later\u2026</td>
+        <td></td>
+      </tr>
+    `
+  } else {
+    try {
+      const keys = Object.keys(stats)
+
+      for (let j = 0; j < keys.length; j++) {
+        // Skip meta
+        if (keys[j] === 'meta') {
+          continue
+        }
+
+        const data = stats[keys[j]]
+        const isDataObj = typeof data === 'object' && data
+
+        const type = (isDataObj && data.type) || 'auto'
+        // Skip hidden
+        if (type === 'hidden') {
+          continue
+        }
+
+        const value = isDataObj ? data.value : data
+        let parsed = void 0
+
+        switch (type) {
+          case 'byte':
+            parsed = page.getPrettyBytes(value)
+            break
+          case 'byteUsage': {
+            if (typeof value === 'object') {
+              // Reasoning: https://github.com/sebhildebrandt/systeminformation/issues/464#issuecomment-756406053
+              const totalForPercentage = typeof value.available !== 'undefined'
+                ? (value.used + value.available)
+                : value.total
+              parsed = `${page.getPrettyBytes(value.used)} / ${page.getPrettyBytes(value.total)} (${(value.used / totalForPercentage * 100).toFixed(2)}%)`
+            } else {
+              parsed = value
+            }
+            break
+          }
+          case 'detailed':
+            parsed = `
+              <table class="table is-narrow is-fullwidth is-hoverable">
+                <tbody>
+                  ${Object.keys(value).map(type => {
+                    let detailedValue = void 0
+                    switch (typeof value[type]) {
+                      case 'number':
+                        detailedValue = value[type].toLocaleString()
+                        break
+                      default:
+                        detailedValue = value[type]
+                    }
+                    return `
+                      <tr>
+                        <th${data.valueAction ? ` data-action="${data.valueAction}"` : ''}>${type}</th>
+                        <td>${detailedValue}</td>
+                      </tr>
+                    `
+                  }).join('\n')}
+                </tbody>
+              </table>
+            `
+            break
+          case 'tempC':
+            // TODO: Unit conversion when required?
+            parsed = typeof value === 'number'
+              ? `${value} C`
+              : value
+            break
+          case 'uptime':
+            parsed = page.getPrettyUptime(value)
+            break
+          case 'unavailable':
+            parsed = 'N/A'
+            break
+          case 'auto':
+            switch (typeof value) {
+              case 'number':
+                parsed = value.toLocaleString()
+                break
+              default:
+                parsed = value
+            }
+            break
+          default:
+            parsed = value
+        }
+
+        let keyAttrs = ''
+        if (isDataObj && data.action) {
+          keyAttrs += ` data-action="${data.action}"`
+          if (data.actionData) {
+            keyAttrs += ` data-action-data="${data.actionData}"`
+          }
+        }
+
+        rows += `
+          <tr>
+            <th${keyAttrs}>${keys[j]}</th$>
+            <td>${parsed}</td>
+          </tr>
+        `
+      }
+
+      if (typeof stats.meta !== 'undefined') {
+        // Reload key
+        if (typeof stats.meta.key === 'string') {
+          statsKey = stats.meta.key
+          meta.push(`<i class="icon-arrows-cw" data-action="reload-stats-category" data-key="${stats.meta.key}"></i>`)
+        }
+        // generatedOn
+        if (typeof stats.meta.generatedOn !== 'undefined') {
+          meta.push(`Generated on ${page.getPrettyDate(new Date(stats.meta.generatedOn))}`)
+        }
+        // maxAge
+        if (typeof stats.meta.maxAge === 'number') {
+          meta.push(`(${stats.meta.maxAge / 1000}s)`)
+        } else {
+          meta.push('(auto)')
+        }
+      }
+    } catch (error) {
+      rows = `
+        <tr>
+          <td>Error parsing response. Try again?</td>
+          <td></td>
+        </tr>
+      `
+      page.onError(error)
+    }
+  }
+
+  return `
+    <div${statsKey ? ` id="stats-${statsKey}"` : ''} class="table-container has-text-left">
+      <table class="table statistics is-narrow is-fullwidth is-hoverable">
+        <thead>
+          <tr>
+            <th class="capitalize">${title}</th>
+            <td class="has-text-right">${meta.join(' ')}</td>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `
+}
+
 page.getStatistics = (params = {}) => {
   if (!page.permissions.admin) return swal('An error occurred!', 'You cannot do this!', 'error')
 
@@ -3148,165 +3310,15 @@ page.getStatistics = (params = {}) => {
     }
 
     let content = ''
+
     const keys = Object.keys(response.data.stats)
     for (let i = 0; i < keys.length; i++) {
-      const meta = []
-      let rows = ''
-
-      if (!response.data.stats[keys[i]]) {
-        rows += `
-          <tr>
-            <td>Still being generated, please try again later\u2026</td>
-            <td></td>
-          </tr>
-        `
-      } else {
-        try {
-          const valKeys = Object.keys(response.data.stats[keys[i]])
-
-          for (let j = 0; j < valKeys.length; j++) {
-            // Skip meta
-            if (valKeys[j] === 'meta') {
-              continue
-            }
-
-            const data = response.data.stats[keys[i]][valKeys[j]]
-            const isDataObj = typeof data === 'object' && data
-
-            const type = (isDataObj && data.type) || 'auto'
-            // Skip hidden
-            if (type === 'hidden') {
-              continue
-            }
-
-            const value = isDataObj ? data.value : data
-            let parsed = void 0
-
-            switch (type) {
-              case 'byte':
-                parsed = page.getPrettyBytes(value)
-                break
-              case 'byteUsage': {
-                if (typeof value === 'object') {
-                  // Reasoning: https://github.com/sebhildebrandt/systeminformation/issues/464#issuecomment-756406053
-                  const totalForPercentage = typeof value.available !== 'undefined'
-                    ? (value.used + value.available)
-                    : value.total
-                  parsed = `${page.getPrettyBytes(value.used)} / ${page.getPrettyBytes(value.total)} (${(value.used / totalForPercentage * 100).toFixed(2)}%)`
-                } else {
-                  parsed = value
-                }
-                break
-              }
-              case 'detailed':
-                parsed = `
-                  <table class="table is-narrow is-fullwidth is-hoverable">
-                    <tbody>
-                      ${Object.keys(value).map(type => {
-                        let detailedValue = void 0
-                        switch (typeof value[type]) {
-                          case 'number':
-                            detailedValue = value[type].toLocaleString()
-                            break
-                          default:
-                            detailedValue = value[type]
-                        }
-                        return `
-                          <tr>
-                            <th${data.valueAction ? ` data-action="${data.valueAction}"` : ''}>${type}</th>
-                            <td>${detailedValue}</td>
-                          </tr>
-                        `
-                      }).join('\n')}
-                    </tbody>
-                  </table>
-                `
-                break
-              case 'tempC':
-                // TODO: Unit conversion when required?
-                parsed = typeof value === 'number'
-                  ? `${value} C`
-                  : value
-                break
-              case 'uptime':
-                parsed = page.getPrettyUptime(value)
-                break
-              case 'unavailable':
-                parsed = 'N/A'
-                break
-              case 'auto':
-                switch (typeof value) {
-                  case 'number':
-                    parsed = value.toLocaleString()
-                    break
-                  default:
-                    parsed = value
-                }
-                break
-              default:
-                parsed = value
-            }
-
-            let keyAttrs = ''
-            if (isDataObj && data.action) {
-              keyAttrs += ` data-action="${data.action}"`
-              if (data.actionData) {
-                keyAttrs += ` data-action-data="${data.actionData}"`
-              }
-            }
-
-            rows += `
-              <tr>
-                <th${keyAttrs}>${valKeys[j]}</th$>
-                <td>${parsed}</td>
-              </tr>
-            `
-          }
-
-          const _meta = response.data.stats[keys[i]].meta
-          if (typeof _meta !== 'undefined') {
-            // generatedOn
-            if (typeof _meta.generatedOn !== 'undefined') {
-              meta.push(`Generated on ${page.getPrettyDate(new Date(_meta.generatedOn))}`)
-            }
-            // maxAge
-            if (typeof _meta.maxAge === 'number') {
-              meta.push(`(${_meta.maxAge / 1000}s)`)
-            } else {
-              meta.push('(auto)')
-            }
-          }
-        } catch (error) {
-          rows = `
-            <tr>
-              <td>Error parsing response. Try again?</td>
-              <td></td>
-            </tr>
-          `
-          page.onError(error)
-        }
-      }
-
-      content += `
-        <div class="table-container has-text-left">
-          <table id="statistics" class="table is-narrow is-fullwidth is-hoverable">
-            <thead>
-              <tr>
-                <th class="capitalize">${keys[i]}</th>
-                <td class="has-text-right">${meta.join(' ')}</td>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-        </div>
-      `
+      content += page.buildStatisticTable(keys[i], response.data.stats[keys[i]])
     }
 
     if (Array.isArray(response.data.hrtime)) {
       content += `
-        <article class="message is-size-7">
+        <article id="stats-hrtime" class="message is-size-7">
           <div class="message-body has-text-left">
             Time taken: ${response.data.hrtime[0]}s ${Math.ceil(response.data.hrtime[1] / 1000000)}ms.
           </div>
@@ -3321,6 +3333,68 @@ page.getStatistics = (params = {}) => {
   }).catch(error => {
     page.updateTrigger(params.trigger)
     page.onAxiosError(error)
+  })
+}
+
+page.getStatisticsCategory = (params = {}) => {
+  if (!page.permissions.admin) return swal('An error occurred!', 'You cannot do this!', 'error')
+
+  if (page.isSomethingLoading) return page.warnSomethingLoading()
+
+  if (!params.key) return swal('An error occurred!', 'Missing stats category key!', 'error')
+
+  page.updateTrigger(params.trigger, 'loading')
+
+  const url = `api/stats/${params.key}`
+  axios.get(url).then(response => {
+    if (response.data.success === false) {
+      if (response.data.description === 'No token provided') {
+        return page.verifyToken(page.token)
+      } else {
+        page.updateTrigger(params.trigger)
+        return swal('An error occurred!', response.data.description, 'error')
+      }
+    }
+
+    const [title, stats] = Object.entries(response.data.stats).find(([name, stats]) => {
+      return stats && stats.meta && stats.meta.key === params.key
+    })
+    if (!title) {
+      return swal('An error occurred!', 'Server did not return required stats data.', 'error')
+    }
+
+    const statsTable = document.querySelector(`#stats-${params.key}`)
+    if (!statsTable) return
+
+    statsTable.innerHTML = page.buildStatisticTable(title, stats)
+
+    if (Array.isArray(response.data.hrtime)) {
+      const statsHrTime = document.querySelector('#stats-hrtime')
+      if (statsHrTime) {
+        statsHrTime.innerHTML = `
+          <article class="message is-size-7">
+            <div class="message-body has-text-left">
+              Time taken: ${response.data.hrtime[0]}s ${Math.ceil(response.data.hrtime[1] / 1000000)}ms.
+            </div>
+          </article>
+        `
+      }
+    }
+
+    page.updateTrigger(params.trigger, 'active')
+  }).catch(error => {
+    page.updateTrigger(params.trigger)
+    page.onAxiosError(error)
+  })
+}
+
+page.reloadStatsCategory = element => {
+  const key = element.dataset.key
+  if (!key) return
+
+  page.getStatisticsCategory({
+    key,
+    trigger: document.querySelector('#itemStatistics')
   })
 }
 

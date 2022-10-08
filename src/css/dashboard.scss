@@ -140,7 +140,7 @@ li[data-action="page-ellipsis"] {
   }
 }
 
-#statistics {
+.statistics {
   thead,
   tbody {
     > tr {
@@ -178,6 +178,10 @@ li[data-action="page-ellipsis"] {
       &:hover {
         text-decoration: dotted underline
       }
+    }
+
+    i[data-action] {
+      cursor: pointer
     }
   }
 }
