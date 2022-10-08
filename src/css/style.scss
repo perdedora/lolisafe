@@ -249,6 +249,10 @@ fieldset[disabled] .select select:hover {
   word-break: break-all
 }
 
+.anim-fade-in {
+  animation: fade-in-opacity 0.5s
+}
+
 /** Fontello overrides **/
 
 .icon-gauge::before {

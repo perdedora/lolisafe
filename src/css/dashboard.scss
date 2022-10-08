@@ -7,10 +7,6 @@ body {
   animation: none
 }
 
-#dashboard {
-  animation: fade-in-opacity 0.5s
-}
-
 .menu-label {
   color: $grey-light
 }
@@ -72,10 +68,6 @@ body {
       padding-left: 0.75em
     }
   }
-}
-
-#page.fade-in {
-  animation: fade-in-opacity 0.5s
 }
 
 .pagination {

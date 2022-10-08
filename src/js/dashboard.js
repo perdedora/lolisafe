@@ -427,22 +427,23 @@ page.domClick = event => {
   }
 }
 
-page.fadeInDom = disableFading => {
-  if (page.fadingIn) {
-    clearTimeout(page.fadingIn)
-    page.dom.classList.remove('fade-in')
+page.fadeIn = (element = page.dom, disableFading = false) => {
+  if (element._fadeInTimeout) {
+    clearTimeout(element._fadeInTimeout)
+    element.classList.remove('anim-fade-in')
   }
 
   if (!disableFading) {
-    page.dom.classList.add('fade-in')
-    page.fadingIn = setTimeout(() => {
-      page.dom.classList.remove('fade-in')
+    element.classList.add('anim-fade-in')
+    element._fadeInTimeout = setTimeout(() => {
+      element.classList.remove('anim-fade-in')
+      delete element._fadeInTimeout
     }, 500)
   }
 }
 
-page.scrollToDom = disableSmooth => {
-  page.dom.scrollIntoView({
+page.scrollTo = (element = page.dom, disableSmooth = false) => {
+  element.scrollIntoView({
     behavior: disableSmooth ? 'auto' : 'smooth',
     block: 'start',
     inline: 'nearest'
@@ -909,14 +910,14 @@ page.getUploads = (params = {}) => {
       selectAll.title = 'Unselect all'
     }
 
-    page.fadeInDom()
+    page.fadeIn(page.dom)
 
     const pageNum = files.length ? params.pageNum : 0
     if (params.forceScroll ||
       page.prevPageNums[page.currentView] === null ||
       page.prevPageNums[page.currentView] !== pageNum) {
       const disableSmooth = !params.forceScroll && page.views[page.currentView].type === 'thumbs'
-      page.scrollToDom(disableSmooth)
+      page.scrollTo(page.dom, disableSmooth)
     }
 
     if (page.views[page.currentView].type === 'thumbs') {
@@ -1497,8 +1498,8 @@ page.deleteUploadsByNames = (params = {}) => {
       </div>
     </form>
   `
-  page.fadeInDom()
-  page.scrollToDom()
+  page.fadeIn(page.dom)
+  page.scrollTo(page.dom)
   page.updateTrigger(params.trigger, 'active')
 
   document.querySelector('#submitBulkDelete').addEventListener('click', () => {
@@ -2015,13 +2016,13 @@ page.getAlbums = (params = {}) => {
       selectAll.title = 'Unselect all'
     }
 
-    page.fadeInDom()
+    page.fadeIn(page.dom)
 
     const pageNum = albums.length ? params.pageNum : 0
     if (params.forceScroll ||
       page.prevPageNums[page.currentView] === null ||
       page.prevPageNums[page.currentView] !== pageNum) {
-      page.scrollToDom()
+      page.scrollTo(page.dom)
     }
 
     page.updateTrigger(params.trigger, 'active')
@@ -2391,8 +2392,8 @@ page.changeToken = (params = {}) => {
       </div>
     </div>
   `
-  page.fadeInDom()
-  page.scrollToDom()
+  page.fadeIn(page.dom)
+  page.scrollTo(page.dom)
   page.updateTrigger(params.trigger, 'active')
 
   document.querySelector('#getNewToken').addEventListener('click', event => {
@@ -2457,8 +2458,8 @@ page.changePassword = (params = {}) => {
       </div>
     </form>
   `
-  page.fadeInDom()
-  page.scrollToDom()
+  page.fadeIn(page.dom)
+  page.scrollTo(page.dom)
   page.updateTrigger(params.trigger, 'active')
 
   document.querySelector('#sendChangePassword').addEventListener('click', event => {
@@ -2743,13 +2744,13 @@ page.getUsers = (params = {}) => {
       selectAll.title = 'Unselect all'
     }
 
-    page.fadeInDom()
+    page.fadeIn(page.dom)
 
     const pageNum = users.length ? params.pageNum : 0
     if (params.forceScroll ||
       page.prevPageNums[page.currentView] === null ||
       page.prevPageNums[page.currentView] !== pageNum) {
-      page.scrollToDom()
+      page.scrollTo(page.dom)
     }
 
     page.updateTrigger(params.trigger, 'active')
@@ -3327,8 +3328,8 @@ page.getStatistics = (params = {}) => {
     }
 
     page.dom.innerHTML = content
-    page.fadeInDom()
-    page.scrollToDom()
+    page.fadeIn(page.dom)
+    page.scrollTo(page.dom)
     page.updateTrigger(params.trigger, 'active')
   }).catch(error => {
     page.updateTrigger(params.trigger)
@@ -3381,6 +3382,7 @@ page.getStatisticsCategory = (params = {}) => {
       }
     }
 
+    page.fadeIn(statsTable)
     page.updateTrigger(params.trigger, 'active')
   }).catch(error => {
     page.updateTrigger(params.trigger)
