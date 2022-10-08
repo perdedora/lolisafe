@@ -9,25 +9,40 @@ const page = {
 
   // Array of extensions that will be whitelisted for SimpleLightbox
   // Should only include image extensions that can be rendered directly on browsers
-  lightboxExts: ['.gif', '.jpeg', '.jpg', '.png', '.svg', '.tif', '.tiff', '.webp', '.bmp']
+  lightboxExts: ['.gif', '.jpeg', '.jpg', '.png', '.svg', '.tif', '.tiff', '.webp', '.bmp'],
+
+  updateImageContainer: element => {
+    // Update size & string elements within each individual image container
+    const container = element.parentNode.parentNode
+    if (!container.classList.contains('image-container')) return
+
+    const sizeElement = container.querySelector('.file-size')
+    if (sizeElement) {
+      const string = sizeElement.dataset.value || sizeElement.innerHTML
+      sizeElement.innerHTML = page.getPrettyBytes(parseInt(string, 10))
+    }
+
+    const dateElement = document.querySelector('.file-date')
+    if (dateElement) {
+      const string = dateElement.dataset.value
+      dateElement.innerHTML = page.getPrettyDate(new Date(parseInt(string, 10) * 1000))
+    }
+  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  // Prettify all .file-size elements
-  const sizeElements = document.querySelectorAll('.file-size')
-  for (let i = 0; i < sizeElements.length; i++) {
-    const string = sizeElements[i].dataset.value || sizeElements[i].innerHTML
-    sizeElements[i].innerHTML = page.getPrettyBytes(parseInt(string, 10))
+  // Update size string in album header block
+  const headerSize = document.querySelector('#count .file-size')
+  if (headerSize) {
+    const string = headerSize.dataset.value || headerSize.innerHTML
+    headerSize.innerHTML = page.getPrettyBytes(parseInt(string, 10))
   }
 
-  // Prettify all .file-date elements
-  const dateElements = document.querySelectorAll('.file-date')
-  for (let i = 0; i < dateElements.length; i++) {
-    const string = dateElements[i].dataset.value
-    dateElements[i].innerHTML = page.getPrettyDate(new Date(parseInt(string, 10) * 1000))
-  }
-
-  page.lazyLoad = new LazyLoad()
+  // Attach callback function to lazyloader
+  page.lazyLoad = new LazyLoad({
+    unobserve_entered: true,
+    callback_enter: page.updateImageContainer
+  })
 
   // Build RegExp out of imageExts array
   // SimpleLightbox demands RegExp for configuring supported file extensions
