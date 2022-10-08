@@ -90,7 +90,7 @@
     "stylelint-config-standard-scss": "~5.0.0"
   },
   "volta": {
-    "node": "16.17.1",
+    "node": "18.10.0",
     "yarn": "1.22.19"
   }
 }

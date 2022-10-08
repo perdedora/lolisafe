@@ -51,7 +51,7 @@ Please make sure your config matches the sample in `config.sample.js` before sta
 1. Ensure you have at least [Node.js](https://nodejs.org/en/download/) v14.x and [Yarn](https://yarnpkg.com/getting-started/install#install-corepack) v1.x installed.
 
 > **Note**  
-> Fully compatible up to Node.js v16.x LTS (untested with Node.js v17.x or later).  
+> Fully compatible up to Node.js v18.x.  
 > I recommend using [Volta](https://github.com/volta-cli/volta) to ensure you will always have & use the correct Node.js and Yarn versions for lolisafe, even if the requirements change in future updates.  
 >
 > If you want to use this on Docker, please check out the [docker directory](https://github.com/BobbyWibowo/lolisafe/tree/safe.fiery.me/docker) instead.
