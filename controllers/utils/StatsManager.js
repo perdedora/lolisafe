@@ -5,32 +5,32 @@ const perms = require('./../permissionController')
 const Constants = require('./Constants')
 const logger = require('./../../logger')
 
-const Type = Object.freeze({
-  // Should contain key value: number
-  UPTIME: 'uptime',
-  // Should contain key value: number
-  BYTE: 'byte',
-  // Should contain key value: { used: number, total: number }
-  BYTE_USAGE: 'byteUsage',
-  // Should contain key value: number
-  TEMP_CELSIUS: 'tempC',
-  // Should contain key data: Array<{ key: string, value: number | string }>
-  // and optionally a count/total
-  DETAILED: 'detailed',
-  // Should contain key value: null
-  // May consider still displaying entries with this type in the frontend,
-  // but mark as unavailable explicitly due to backend lacking the capabilities
-  UNAVAILABLE: 'unavailable',
-  // Hidden type should be skipped during iteration, can contain anything
-  // These should be treated on a case by case basis on the frontend
-  HIDDEN: 'hidden'
-})
-
 const self = {
   _buildExtsRegex: exts => {
     const str = exts.map(ext => ext.substring(1)).join('|')
     return new RegExp(`\\.(${str})$`, 'i')
   },
+
+  Type: Object.freeze({
+    // Should contain key value: number
+    UPTIME: 'uptime',
+    // Should contain key value: number
+    BYTE: 'byte',
+    // Should contain key value: { used: number, total: number }
+    BYTE_USAGE: 'byteUsage',
+    // Should contain key value: number
+    TEMP_CELSIUS: 'tempC',
+    // Should contain key data: Array<{ key: string, value: number | string }>
+    // and optionally a count/total
+    DETAILED: 'detailed',
+    // Should contain key value: null
+    // May consider still displaying entries with this type in the frontend,
+    // but mark as unavailable explicitly due to backend lacking the capabilities
+    UNAVAILABLE: 'unavailable',
+    // Hidden type should be skipped during iteration, can contain anything
+    // These should be treated on a case by case basis on the frontend
+    HIDDEN: 'hidden'
+  }),
 
   cachedStats: {}
 }
@@ -63,15 +63,15 @@ self.getSystemInfo = async () => {
       ? {
           value: cpuTemperature.main,
           // Temperature value from this library is hard-coded to Celsius
-          type: Type.TEMP_CELSIUS
+          type: self.Type.TEMP_CELSIUS
         }
-      : { value: null, type: Type.UNAVAILABLE },
+      : { value: null, type: self.Type.UNAVAILABLE },
     Memory: {
       value: {
         used: mem.active,
         total: mem.total
       },
-      type: Type.BYTE_USAGE
+      type: self.Type.BYTE_USAGE
     },
     Swap: mem && typeof mem.swaptotal === 'number' && mem.swaptotal > 0
       ? {
@@ -79,12 +79,12 @@ self.getSystemInfo = async () => {
             used: mem.swapused,
             total: mem.swaptotal
           },
-          type: Type.BYTE_USAGE
+          type: self.Type.BYTE_USAGE
         }
-      : { value: null, type: Type.UNAVAILABLE },
+      : { value: null, type: self.Type.UNAVAILABLE },
     Uptime: {
       value: Math.floor(time.uptime),
-      type: Type.UPTIME
+      type: self.Type.UPTIME
     }
   }
 }
@@ -108,11 +108,11 @@ self.getServiceInfo = async () => {
     // Scanner: self.scan.version || 'N/A',
     'Memory Usage': {
       value: process.memoryUsage().rss,
-      type: Type.BYTE
+      type: self.Type.BYTE
     },
     Uptime: {
       value: Math.floor(nodeUptime),
-      type: Type.UPTIME
+      type: self.Type.UPTIME
     }
   }
 }
@@ -128,7 +128,7 @@ self.getFileSystems = async () => {
         total: fs.size,
         used: fs.used
       },
-      type: Type.BYTE_USAGE
+      type: self.Type.BYTE_USAGE
     }
     // "available" is a new attribute in systeminformation v5, only tested on Linux,
     // so add an if-check just in case its availability is limited in other platforms
@@ -174,12 +174,12 @@ self.getUploadsStats = async db => {
     },
     'Size in DB': {
       value: 0,
-      type: Type.BYTE
+      type: self.Type.BYTE
     },
     'Mime Types': {
       value: {},
       valueAction: 'filter-uploads-by-type',
-      type: Type.DETAILED
+      type: self.Type.DETAILED
     }
   }
 
@@ -229,7 +229,7 @@ self.getUsersStats = async db => {
     Disabled: 0,
     Usergroups: {
       value: {},
-      type: Type.DETAILED
+      type: self.Type.DETAILED
     }
   }
 
@@ -278,6 +278,7 @@ self.getAlbumsStats = async db => {
     activeAlbums.push(album.id)
     if (album.download) stats.Downloadable++
     if (album.public) stats.Public++
+    if (album.zipGeneratedAt) stats['ZIP Generated']++
   }
 
   const files = await jetpack.listAsync(paths.zips)
@@ -302,36 +303,40 @@ self.statGenerators = {
   service: {
     title: 'Service',
     funct: self.getServiceInfo,
-    maxAge: 500
+    maxAge: 1000
   },
   fileSystems: {
     title: 'File Systems',
     funct: self.getFileSystems,
-    maxAge: 60000
+    maxAge: 1000
   },
   uploads: {
     title: 'Uploads',
-    funct: self.getUploadsStats,
-    maxAge: -1
+    funct: self.getUploadsStats
   },
   users: {
     title: 'Users',
-    funct: self.getUsersStats,
-    maxAge: -1
+    funct: self.getUsersStats
   },
   albums: {
     title: 'Albums',
-    funct: self.getAlbumsStats,
-    maxAge: -1
+    funct: self.getAlbumsStats
   }
 }
 
 self.statNames = Object.keys(self.statGenerators)
 
-self.generateStats = async db => {
-  await Promise.all(self.statNames.map(async name => {
-    const generator = self.statGenerators[name]
+self.generateStats = async (db, categories, force = false) => {
+  let generators
+  if (Array.isArray(categories) && categories.length) {
+    generators = categories.map(category => {
+      return [category, self.statGenerators[category]]
+    })
+  } else {
+    generators = Object.entries(self.statGenerators)
+  }
 
+  await Promise.all(generators.map(async ([name, opts]) => {
     if (!self.cachedStats[name]) {
       self.cachedStats[name] = {
         cache: null,
@@ -343,10 +348,15 @@ self.generateStats = async db => {
     // Skip if still generating
     if (self.cachedStats[name].generating) return
 
-    if (self.cachedStats[name].cache && typeof generator.maxAge === 'number') {
-      // Skip if maxAge is negative (requires cache to be invaildated via other means),
-      // or cache still satisfies maxAge
-      if (generator.maxAge < 0 || (Date.now() - self.cachedStats[name].generatedOn <= generator.maxAge)) {
+    // Skip if cache already exists, and satisfies the following...
+    if (self.cachedStats[name].cache) {
+      if (typeof opts.maxAge === 'number') {
+        // maxAge is configured, is not forced to re-generated, and cache still satisfies it
+        if (!force && Date.now() - self.cachedStats[name].generatedOn <= opts.maxAge) {
+          return
+        }
+      } else if (!force) {
+        // Otherwise, maxAge is not configured, and is not forced to re-generate
         return
       }
     }
@@ -354,7 +364,7 @@ self.generateStats = async db => {
     self.cachedStats[name].generating = true
 
     logger.debug(`${name}: Generating\u2026`)
-    self.cachedStats[name].cache = await generator.funct(db)
+    self.cachedStats[name].cache = await opts.funct(db)
       .catch(error => {
         logger.error(error)
         return null
@@ -364,21 +374,6 @@ self.generateStats = async db => {
     self.cachedStats[name].generating = false
     logger.debug(`${name}: OK`)
   }))
-
-  return self.statNames.reduce((acc, name) => {
-    const title = self.statGenerators[name].title
-    acc[title] = {
-      ...(self.cachedStats[name].cache || {}),
-      meta: {
-        cached: Boolean(self.cachedStats[name].cache),
-        generatedOn: self.cachedStats[name].generatedOn,
-        maxAge: typeof self.statGenerators[name].maxAge === 'number'
-          ? self.statGenerators[name].maxAge
-          : null
-      }
-    }
-    return acc
-  }, {})
 }
 
 module.exports = self

@@ -3271,11 +3271,9 @@ page.getStatistics = (params = {}) => {
             }
             // maxAge
             if (typeof _meta.maxAge === 'number') {
-              if (_meta.maxAge >= 0) {
-                meta.push(`(${_meta.maxAge / 1000}s)`)
-              } else {
-                meta.push('(auto)')
-              }
+              meta.push(`(${_meta.maxAge / 1000}s)`)
+            } else {
+              meta.push('(auto)')
             }
           }
         } catch (error) {

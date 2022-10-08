@@ -748,6 +748,27 @@ self.deleteStoredAlbumRenders = albumids => {
 
 self.invalidateStatsCache = StatsManager.invalidateStatsCache
 
+self.buildStatsPayload = name => {
+  return {
+    ...((StatsManager.cachedStats[name] && StatsManager.cachedStats[name].cache) || {}),
+    meta: {
+      key: name,
+      ...(StatsManager.cachedStats[name]
+        ? {
+            cached: Boolean(StatsManager.cachedStats[name].cache),
+            generatedOn: StatsManager.cachedStats[name].generatedOn || 0,
+            maxAge: typeof StatsManager.statGenerators[name].maxAge === 'number'
+              ? StatsManager.statGenerators[name].maxAge
+              : null
+          }
+        : {
+            cached: false
+          }),
+      type: StatsManager.Type.HIDDEN
+    }
+  }
+}
+
 self.stats = async (req, res) => {
   const isadmin = perms.is(req.locals.user, 'admin')
   if (!isadmin) {
@@ -756,7 +777,38 @@ self.stats = async (req, res) => {
 
   const hrstart = process.hrtime()
 
-  const stats = await StatsManager.generateStats(self.db)
+  await StatsManager.generateStats(self.db)
+
+  // Ensures object payload has its keys matching the required ordering
+  const stats = StatsManager.statNames.reduce((acc, name) => {
+    const title = StatsManager.statGenerators[name].title
+    acc[title] = self.buildStatsPayload(name)
+    return acc
+  }, {})
+
+  return res.json({ success: true, stats, hrtime: process.hrtime(hrstart) })
+}
+
+self.statsCategory = async (req, res) => {
+  const isadmin = perms.is(req.locals.user, 'admin')
+  if (!isadmin) {
+    return res.status(403).end()
+  }
+
+  const category = req.path_parameters && req.path_parameters.category
+  if (!category || !StatsManager.statNames.includes(category)) {
+    throw new ClientError('Bad request.')
+  }
+
+  const hrstart = process.hrtime()
+
+  // Generate required stats category, forced
+  await StatsManager.generateStats(self.db, [category], true)
+
+  const title = StatsManager.statGenerators[category].title
+  const stats = {
+    [title]: self.buildStatsPayload(category)
+  }
 
   return res.json({ success: true, stats, hrtime: process.hrtime(hrstart) })
 }

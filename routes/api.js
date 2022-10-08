@@ -93,5 +93,6 @@ routes.post('/tokens/verify', utils.assertJSON, tokens.verify)
 /** ./controllers/utilsController.js */
 
 routes.get('/stats', [auth.requireUser], utils.stats)
+routes.get('/stats/:category', [auth.requireUser], utils.statsCategory)
 
 module.exports = routes
