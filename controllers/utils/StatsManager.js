@@ -3,6 +3,7 @@ const si = require('systeminformation')
 const paths = require('./../pathsController')
 const perms = require('./../permissionController')
 const Constants = require('./Constants')
+const ScannerManager = require('./ScannerManager')
 const logger = require('./../../logger')
 
 const self = {
@@ -12,6 +13,10 @@ const self = {
   },
 
   Type: Object.freeze({
+    // Should contain key value: string | number
+    // Client is expected to automatically assume this type
+    // if "type" attribute is not specified (number should also be localized)
+    AUTO: 'auto',
     // Should contain key value: number
     UPTIME: 'uptime',
     // Should contain key value: number
@@ -92,20 +97,11 @@ self.getSystemInfo = async () => {
 self.getServiceInfo = async () => {
   const nodeUptime = process.uptime()
 
-  /*
-    if (self.scan.instance) {
-      try {
-        self.scan.version = await self.scan.instance.getVersion().then(s => s.trim())
-      } catch (error) {
-        logger.error(error)
-        self.scan.version = 'Errored when querying version.'
-      }
-    }
-    */
-
   return {
     'Node.js': `${process.versions.node}`,
-    // Scanner: self.scan.version || 'N/A',
+    Scanner: ScannerManager.instance
+      ? ScannerManager.version
+      : { value: null, type: self.Type.UNAVAILABLE },
     'Memory Usage': {
       value: process.memoryUsage().rss,
       type: self.Type.BYTE
