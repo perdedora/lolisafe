@@ -16,16 +16,16 @@ const page = {
     const container = element.parentNode.parentNode
     if (!container.classList.contains('image-container')) return
 
-    const sizeElement = container.querySelector('.file-size')
-    if (sizeElement) {
-      const string = sizeElement.dataset.value || sizeElement.innerHTML
-      sizeElement.innerHTML = page.getPrettyBytes(parseInt(string, 10))
+    const size = container.querySelector('.file-size')
+    if (size) {
+      const string = size.dataset.value || size.innerHTML
+      size.innerHTML = page.getPrettyBytes(parseInt(string, 10))
     }
 
-    const dateElement = document.querySelector('.file-date')
-    if (dateElement) {
-      const string = dateElement.dataset.value
-      dateElement.innerHTML = page.getPrettyDate(new Date(parseInt(string, 10) * 1000))
+    const date = container.querySelector('.file-date')
+    if (date) {
+      const string = date.dataset.value
+      date.innerHTML = page.getPrettyDate(new Date(parseInt(string, 10) * 1000))
     }
   }
 }
