@@ -556,7 +556,7 @@ self.stripTags = async (name, extname) => {
   return jetpack.inspectAsync(fullPath)
 }
 
-self.unlinkFile = async (filename, predb) => {
+self.unlinkFile = async filename => {
   await jetpack.removeAsync(path.join(paths.uploads, filename))
 
   const identifier = filename.split('.')[0]
@@ -607,7 +607,7 @@ self.bulkDeleteFromDb = async (field, values, user) => {
 
       await Promise.all(files.map(async file => {
         try {
-          await self.unlinkFile(file.name, true)
+          await self.unlinkFile(file.name)
           unlinked.push(file)
         } catch (error) {
           logger.error(error)
