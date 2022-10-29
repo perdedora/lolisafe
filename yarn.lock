@@ -1087,9 +1087,9 @@ caniuse-api@^3.0.0:
     lodash.uniq "^4.5.0"
 
 caniuse-lite@^1.0.0, caniuse-lite@^1.0.30001304, caniuse-lite@^1.0.30001400, caniuse-lite@^1.0.30001407:
-  version "1.0.30001418"
-  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001418.tgz"
-  integrity sha512-oIs7+JL3K9JRQ3jPZjlH6qyYDp+nBTCais7hjh0s+fuBwufc7uZ7hPYMXrDOJhV360KGMTcczMRObk0/iMqZRg==
+  version "1.0.30001426"
+  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001426.tgz"
+  integrity sha512-n7cosrHLl8AWt0wwZw/PJZgUg3lV0gk9LMI7ikGJwhyhgsd2Nb65vKvmSexCqq/J7rbH3mFG6yZZiPR5dLPW5A==
 
 chalk@^2.0.0, chalk@^2.1.0, chalk@^2.3.0:
   version "2.4.2"
@@ -6121,7 +6121,6 @@ typedarray@^0.0.6:
 
 "uWebSockets.js@github:uNetworking/uWebSockets.js#v20.14.0":
   version "20.14.0"
-  uid "873b0a4e9f55e66e1b6cac4767c476fbb3913eba"
   resolved "https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/873b0a4e9f55e66e1b6cac4767c476fbb3913eba"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
