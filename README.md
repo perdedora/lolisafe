@@ -81,7 +81,7 @@ This fork has a separate development mode, with which client-side CSS/JS files i
 
 1. Follow steps **1 to 6** from the production instructions above.
 2. Run `yarn install` to install all dependencies (by omitting `--production` option, Yarn will also install development dependencies).
-3. Run `yarn develop` to start lolisafe in development mode.
+3. Run `yarn dev` to start lolisafe in development mode (or `yarn dev:reload` to also watch file changes).
 
 You can further modify the Gulp tasks through `gulpfile.js` file.
 
