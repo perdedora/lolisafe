@@ -1,16 +1,18 @@
-const routes = require('express').Router()
+const { Router } = require('hyper-express')
+const routes = new Router()
 const utils = require('./../controllers/utilsController')
-const config = require('./../config')
+const config = require('./../controllers/utils/ConfigManager')
 
-routes.get('/v/:identifier/tags', (req, res) => utils.viewMetadata(req, res))
-
-routes.get(
-  '/v/:identifier', async (req, res, next) => {
+const playerHandler = async (req, res) => {
   // Uploads identifiers parsing, etc., are strictly handled by client-side JS at src/js/player.js
-    return res.render('player', {
-      config,
-      versions: utils.versionStrings
-    })
-  })
+  // Rendered page is persistently cached during production (its dynamic content is generated on client-side)
+  return res.render('player', {
+    config, utils, versions: utils.versionStrings
+  }, !utils.devmode)
+}
+
+routes.get('/player/:identifier', playerHandler)
+routes.get('/v/:identifier', playerHandler)
+routes.get('/v/:identifier/tags', (req, res) => utils.viewMetadata(req, res))
 
 module.exports = routes

@@ -28,6 +28,10 @@
 {# Enabling the option below will hide FAQ categories which are irrelevant for personal installation #}
 {% set is_for_personal_use = true %}
 
+{# Requires configuring your own renders in public/render. Consult src/js/misc/render.js. #}
+{% set enable_home_renders = null %} {# String of selected config name #}
+{% set enable_home_newsfeed = false %}
+
 {#
   These are the footer links in the homepage and the No-JS uploader (home.njk & nojs.njk respectively).
   In the homepage uploader, they will be displayed as icons,
@@ -53,16 +57,16 @@
   },
   {
     attrs: {
-      title: 'Paste (PrivateBin)',
-      href: 'https://paste.fiery.me'
+      title: 'Status (UptimeRobot)',
+      href: 'https://status.fiery.me'
     },
-    icon: 'icon-privatebin icon-2x'
+    icon: 'icon-server icon-2x'
   },
   {
     attrs: {
       id: 'ShareX',
       title: 'ShareX user profile',
-      href: 'https://safe.fiery.me/safe.fiery.me.sxcu?v=' + v2
+      href: 'https://safe.fiery.me/safe.fiery.me.sxcu?v=' + (versions[2] or '')
     },
     icon: 'icon-sharex icon-2x'
   },

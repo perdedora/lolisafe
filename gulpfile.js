@@ -1,10 +1,11 @@
 const { exec } = require('child_process')
+const path = require('path')
 const gulp = require('gulp')
 const cssnano = require('cssnano')
-const del = require('del')
 const buble = require('gulp-buble')
 const eslint = require('gulp-eslint-new')
 const gulpif = require('gulp-if')
+const jetpack = require('fs-jetpack')
 const nodemon = require('gulp-nodemon')
 const postcss = require('gulp-postcss')
 const postcssPresetEnv = require('postcss-preset-env')
@@ -20,12 +21,18 @@ try {
   console.log('Using "sass-embedded" package to compile sass\u2026')
 } catch (_) {}
 
+let sassEmbeddedCompiler
+try {
+  sassEmbeddedCompiler = require('sass-embedded')
+  console.log('Using "sass-embedded" package to compile sass\u2026')
+} catch (_) {}
+
 // Put built files for development on a Git-ignored directory.
 // This will prevent IDE's Git from unnecessarily
 // building diff's during development.
 const dist = process.env.NODE_ENV === 'development'
-  ? './dist-dev'
-  : './dist'
+  ? path.join(__dirname, 'dist-dev')
+  : path.join(__dirname, 'dist')
 
 const postcssPlugins = [
   postcssPresetEnv()
@@ -40,18 +47,11 @@ if (process.env.NODE_ENV !== 'development') {
 
 /** TASKS: LINT */
 
-gulp.task('lint:sass', () => {
-  return gulp.src('./src/**/*.scss')
-    .pipe(stylelint({
-      failAfterError: true,
-      reporters: [{ formatter: 'string', console: true }]
-    }))
-})
-
-gulp.task('lint:css', () => {
-  return gulp.src('./src/**/*.css', {
-    ignore: './src/libs/**/*'
-  })
+gulp.task('lint:style', () => {
+  return gulp.src([
+    './src/**/*.css',
+    './src/**/*.scss'
+  ])
     .pipe(stylelint({
       failAfterError: true,
       reporters: [{ formatter: 'string', console: true }]
@@ -76,32 +76,43 @@ gulp.task('lint:js', () => {
 // the other one won't exit prematurely (this is a bit awkward).
 // https://github.com/gulpjs/gulp/issues/1487#issuecomment-466621047
 gulp._settle = true
-gulp.task('lint', gulp.parallel('lint:sass', 'lint:css', 'lint:js'))
+gulp.task('lint', gulp.parallel('lint:style', 'lint:js'))
 gulp._settle = false
 
 /** TASKS: CLEAN */
 
-gulp.task('clean:css', () => {
-  return del([
-    `${dist}/**/*.css`,
-    `${dist}/**/*.css.map`
-  ])
+gulp.task('clean:style', async () => {
+  return jetpack.findAsync(dist, {
+    matching: '**/*.css*(.map)'
+  }).then(files =>
+    Promise.all(files.map(file =>
+      jetpack.removeAsync(file)
+    ))
+  )
 })
 
 gulp.task('clean:js', () => {
-  return del([
-    `${dist}/**/*.js`,
-    `${dist}/**/*.js.map`
-  ])
+  return jetpack.findAsync(dist, {
+    matching: '**/*.js*(.map)'
+  }).then(files =>
+    Promise.all(files.map(file =>
+      jetpack.removeAsync(file)
+    ))
+  )
 })
 
 gulp.task('clean:rest', () => {
-  return del([
-    `${dist}/*`
-  ])
+  // Delete all other files and sub-directories
+  return jetpack.findAsync(dist, {
+    directories: true
+  }).then(files =>
+    Promise.all(files.map(file =>
+      jetpack.removeAsync(file)
+    ))
+  )
 })
 
-gulp.task('clean', gulp.parallel('clean:css', 'clean:js', 'clean:rest'))
+gulp.task('clean', gulp.series(gulp.parallel('clean:style', 'clean:js'), 'clean:rest'))
 
 /** TASKS: BUILD */
 
@@ -162,35 +173,48 @@ gulp.task('default', gulp.series('lint', 'clean', 'build', 'exec:bump-versions')
 
 /** TASKS: WATCH (SKIP LINTER) */
 
+gulp.task('watch:scss', () => {
+  return gulp.watch([
+    'src/**/*.scss'
+  ], gulp.series('build:sass'))
+})
+
 gulp.task('watch:css', () => {
   return gulp.watch([
-    'src/**/*.css',
-    'src/**/*.scss'
-  ], gulp.series('clean:css', 'build:sass', 'build:css', 'build:fontello'))
+    'src/**/*.css'
+  ], {
+    ignored: [
+      'src/libs/fontello/fontello.css'
+    ]
+  }, gulp.series('build:css'))
+})
+gulp.task('watch:fontello', () => {
+  return gulp.watch([
+    'src/libs/fontello/fontello.css'
+  ], gulp.series('build:fontello'))
 })
 
 gulp.task('watch:js', () => {
   return gulp.watch([
     'src/**/*.js'
-  ], gulp.series('clean:js', 'build:js'))
+  ], gulp.series('build:js'))
 })
 
-gulp.task('watch:src', gulp.parallel('watch:css', 'watch:js'))
+gulp.task('watch:src', gulp.parallel('watch:css', 'watch:scss', 'watch:fontello', 'watch:js'))
 
 gulp.task('nodemon', cb => {
   return nodemon({
     script: './lolisafe.js',
     env: process.env,
     watch: [
-      'lolisafe.js',
-      'logger.js',
-      'config.js',
       'controllers/',
-      'database/',
       'routes/',
       'views/_globals.njk',
       'views/_layout.njk',
-      'views/album.njk'
+      'views/album.njk',
+      'config.js',
+      'logger.js',
+      'lolisafe.js'
     ],
     ext: 'js',
     done: cb

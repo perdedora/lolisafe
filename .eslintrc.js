@@ -1,10 +1,8 @@
 module.exports = {
   root: true,
-  parserOptions: {
-    ecmaVersion: 10 // 2019
-  },
   env: {
-    node: true
+    node: true,
+    es2020: true
   },
   extends: [
     'standard'
@@ -13,6 +11,9 @@ module.exports = {
     'object-shorthand': [
       'error',
       'always'
-    ]
+    ],
+    'n/no-unsupported-features/es-builtins': 'error',
+    'n/no-unsupported-features/es-syntax': 'error',
+    'n/no-unsupported-features/node-builtins': 'error'
   }
 }

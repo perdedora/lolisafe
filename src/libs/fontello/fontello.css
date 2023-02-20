@@ -91,6 +91,7 @@
 .icon-th-large::before { content: "\e81a" } /* '' */
 .icon-download::before { content: "\e81b" } /* '' */
 .icon-gatsby::before { content: "\e81c" } /* '' */
+.icon-info::before { content: "\e81d" } /* '' */
 .icon-fast-backward::before { content: "\e81e" } /* '' */
 .icon-cw::before { content: "\e81f" } /* '' */
 .icon-filter::before { content: "\f0b0" } /* '' */
@@ -99,5 +100,6 @@
 .icon-doc-inv::before { content: "\f15b" } /* '' */
 .icon-audio::before { content: "\f1c7" } /* '' */
 .icon-paper-plane::before { content: "\f1d8" } /* '' */
+.icon-server::before { content: "\f233" } /* '' */
 .icon-chrome::before { content: "\f268" } /* '' */
 .icon-firefox::before { content: "\f269" } /* '' */

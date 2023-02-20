@@ -1,4 +1,5 @@
 {
+  "Version": "13.4.0",
   "Name": "safe.horriblecodes.org",
   "DestinationType": "ImageUploader, FileUploader",
   "RequestMethod": "POST",

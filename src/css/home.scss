@@ -9,8 +9,7 @@
   border-radius: 100%;
   display: inline-block;
   margin-bottom: 40px;
-  vertical-align: top;
-  animation: fade-in-opacity 0.5s
+  vertical-align: top
 }
 
 .logo {
@@ -60,7 +59,6 @@
   }
 
   > div {
-    animation: fade-in-opacity 0.5s;
     margin: 0.75rem !important;
 
     &:first-child {
@@ -107,19 +105,14 @@
   margin-top: 5px
 }
 
-#albumDiv {
-  animation: fade-in-opacity 0.5s;
-
-  .control {
-    text-align: inherit
-  }
+#albumDiv .control {
+  text-align: inherit
 }
 
 #linksColumn {
   margin-top: -0.25rem;
   margin-left: -0.25rem;
   margin-right: -0.25rem;
-  animation: fade-in-opacity 0.5s;
 
   .column {
     padding: 0.25rem
@@ -142,11 +135,9 @@
 
 #tabs {
   margin-bottom: 1rem;
-  animation: fade-in-opacity 0.5s;
 
   .tab-content {
-    margin-bottom: -0.75rem;
-    animation: fade-in-opacity 0.5s
+    margin-bottom: -0.75rem
   }
 }
 

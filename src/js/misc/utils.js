@@ -23,21 +23,21 @@ page.prepareShareX = () => {
   const originClean = origin.replace(/\//g, '_')
 
   const sharexConfObj = {
+    Version: '13.4.0',
     Name: originClean,
     DestinationType: 'ImageUploader, FileUploader',
     RequestMethod: 'POST',
     RequestURL: `${window.location.protocol}//${origin}/api/upload`,
     Headers: headers,
-    Body: 'MultipartFromData',
+    Body: 'MultipartFormData',
     FileFormName: 'files[]',
     URL: '$json:files[0].url$',
     ThumbnailURL: '$json:files[0].url$'
   }
 
-  /*
-  if (page.token)
+  if (page.token) {
     sharexConfObj.DeletionURL = '$json:files[0].deleteUrl$'
-  */
+  }
 
   const sharexConfStr = JSON.stringify(sharexConfObj, null, 2)
   const sharexBlob = new Blob([sharexConfStr], { type: 'application/octet-binary' })

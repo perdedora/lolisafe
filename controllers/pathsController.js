@@ -1,30 +1,8 @@
-const { promisify } = require('util')
-const fs = require('fs')
+const jetpack = require('fs-jetpack')
 const path = require('path')
-const config = require('./../config')
-const logger = require('./../logger')
+const config = require('./utils/ConfigManager')
 
 const self = {}
-
-// Promisify these fs functions
-const fsFuncs = [
-  'access',
-  'copyFile',
-  'lstat',
-  'mkdir',
-  'readdir',
-  'readFile',
-  'rename',
-  'rmdir',
-  'stat',
-  'symlink',
-  'unlink',
-  'writeFile'
-]
-
-for (const fsFunc of fsFuncs) {
-  self[fsFunc] = promisify(fs[fsFunc])
-}
 
 self.uploads = path.resolve(config.uploads.folder)
 self.chunks = config.uploads.chunksFolder
@@ -47,39 +25,29 @@ self.errorRoot = path.resolve(config.errorPages.rootDir)
 
 const verify = [
   self.uploads,
-  self.chunks,
+  {
+    path: self.chunks,
+    criteria: { empty: true }
+  },
   self.thumbs,
   self.zips,
   self.logs,
   self.customPages
 ]
 
-self.init = async () => {
-  // Check & create directories
-  for (const p of verify) {
-    try {
-      await self.access(p)
-    } catch (err) {
-      if (err.code !== 'ENOENT') {
-        throw err
-      } else {
-        const mkdir = await self.mkdir(p)
-        if (mkdir) logger.log(`Created directory: ${p}`)
-      }
+if (['better-sqlite3', 'sqlite3'].includes(config.database.client)) {
+  verify.unshift(path.resolve('database'))
+}
+
+self.initSync = () => {
+  // Check & create directories (synchronous)
+  for (const obj of verify) {
+    if (typeof obj === 'object') {
+      jetpack.dir(obj.path, obj.criteria)
+    } else {
+      jetpack.dir(obj)
     }
   }
-
-  // Purge any leftover in chunks directory
-  const uuidDirs = await self.readdir(self.chunks)
-  await Promise.all(uuidDirs.map(async uuid => {
-    const root = path.join(self.chunks, uuid)
-    const chunks = await self.readdir(root)
-    await Promise.all(chunks.map(chunk =>
-      self.unlink(path.join(root, chunk))
-    ))
-    await self.rmdir(root)
-  }))
-  if (uuidDirs.length) logger.log(`Purged ${uuidDirs.length} unfinished chunks`)
 }
 
 module.exports = self

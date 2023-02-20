@@ -19,7 +19,6 @@
 {% endblock %}
 
 {% block scripts %}
-{% if not nojs -%}
 <!-- Libs scripts -->
 <script src="../libs/sweetalert/sweetalert.min.js{{ versions[3] }}"></script>
 <script src="../libs/axios/axios.min.js{{ versions[3] }}"></script>
@@ -32,9 +31,9 @@
 {# We assign an ID for this so that the script can find out proper root URL of uploaded files #}
 <script id="mainScript" src="../js/player.js{{ versions[1] }}" data-upload-root="{{ uploadRoot }}" data-title-format="{{ titleFormat }}"></script>
 <script src="../js/misc/utils.js{{ versions[1] }}"></script>
-{%- endif %}
 {% endblock %}
 
+{% set noscriptRefreshUrl = null %}
 {% block endmeta %}
 {% include "_partial/noscript-refresh.njk" %}
 {% endblock %}
@@ -99,5 +98,6 @@
 
 {% set floatingHomeHref = '..' %}
 {% include "_partial/floating-home.njk" %}
+{% set noscriptMessage = null %}
 {% include "_partial/noscript.njk" %}
 {% endblock %}
