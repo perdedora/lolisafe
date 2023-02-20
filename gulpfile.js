@@ -15,11 +15,6 @@ const sassCompiler = require('sass')
 const sourcemaps = require('gulp-sourcemaps')
 const stylelint = require('@ronilaukkarinen/gulp-stylelint')
 const terser = require('gulp-terser')
-let sassEmbeddedCompiler
-try {
-  sassEmbeddedCompiler = require('sass-embedded')
-  console.log('Using "sass-embedded" package to compile sass\u2026')
-} catch (_) {}
 
 let sassEmbeddedCompiler
 try {
