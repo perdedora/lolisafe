@@ -1,8 +1,8 @@
 const logger = require('./../../logger')
 
-class RequestLogging {
+class DebugLogging {
   constructor () {
-    logger.log('Initiated RequestLogging middleware.')
+    logger.log('Initiated DebugLogging middleware.')
   }
 
   #middleware (req, res, next) {
@@ -21,4 +21,4 @@ class RequestLogging {
   }
 }
 
-module.exports = RequestLogging
+module.exports = DebugLogging

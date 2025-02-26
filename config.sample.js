@@ -21,6 +21,16 @@ module.exports = {
   enableUserAccounts: true,
 
   /*
+    Be advised that this section is only relevant to the migration script.
+    This serves as a compatibility layer to non-fork installs,
+    as it will try to force promote the chosen user to superadmin usergroup,
+    since base lolisafe v3 do not have usergroups system.
+    It is recommended to set "superadminForcePromote" to any falsy value for existing installs.
+  */
+  superadminAccount: 'root',
+  superadminForcePromote: true,
+
+  /*
     Here you can decide if you want lolisafe to serve the files or if you prefer doing so via nginx.
     The main difference between the two is the ease of use and the chance of analytics in the future.
     If you set it to `true`, the uploaded files will be located after the host like:
@@ -592,6 +602,9 @@ module.exports = {
     generateThumbs: {
       image: true,
       video: true,
+      // Generate animated thumbnails wherever applicable.
+      // For now will only work with GIF images, also depends on "image" option being enabled.
+      animated: true,
       // Placeholder defaults to 'public/images/unavailable.png'.
       placeholder: null,
       size: 200,

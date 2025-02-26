@@ -29,6 +29,9 @@ const dist = process.env.NODE_ENV === 'development'
   ? path.join(__dirname, 'dist-dev')
   : path.join(__dirname, 'dist')
 
+// Ensure dist directory exists.
+jetpack.dir(dist)
+
 const postcssPlugins = [
   postcssPresetEnv()
 ]
@@ -154,6 +157,8 @@ gulp.task('build:js', () => {
 
 gulp.task('build', gulp.parallel('build:sass', 'build:css', 'build:fontello', 'build:js'))
 
+gulp.task('build-dev', gulp.series('clean', 'build'))
+
 /** TASKS: VERSION STRINGS */
 
 gulp.task('exec:bump-versions', cb => {
@@ -216,4 +221,4 @@ gulp.task('nodemon', cb => {
   })
 })
 
-gulp.task('watch', gulp.series('clean', 'build', gulp.parallel('watch:src', 'nodemon')))
+gulp.task('watch', gulp.series('clean', 'build', gulp.parallel('nodemon', 'watch:src')))

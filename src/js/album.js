@@ -44,12 +44,6 @@ window.addEventListener('DOMContentLoaded', () => {
     callback_enter: page.updateImageContainer
   })
 
-  // Build RegExp out of imageExts array
-  // SimpleLightbox demands RegExp for configuring supported file extensions
-  const imageExtsRegex = new RegExp(`${page.lightboxExts.map(ext => {
-    return ext.substring(1) // removes starting dot
-  }).join('|')}`, 'i')
-
   page.lightbox = new SimpleLightbox('#table a.image', {
     captions: true,
     captionSelector: 'img',
@@ -57,7 +51,9 @@ window.addEventListener('DOMContentLoaded', () => {
     captionsData: 'alt',
     captionPosition: 'bottom',
     captionDelay: 500,
-    fileExt: imageExtsRegex,
+    fileExt: page.lightboxExts.map(ext => {
+      return ext.substring(1) // removes starting dot
+    }).join('|'),
     preloading: false,
     uniqueImages: false
   })

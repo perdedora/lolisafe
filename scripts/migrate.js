@@ -46,23 +46,34 @@ const map = {
     }
   }
 
-  const root = await db.table('users')
-    .where('username', 'root')
-    .select('permission')
-    .first()
-  if (root && root.permission !== perms.permissions.superadmin) {
-    await db.table('users')
-      .where('username', 'root')
+  if (config.superadminForcePromote) {
+    if (!config.superadminAccount) {
+      console.log('Attempting to promote superadmin user, but "superadminAccount" field is missing from config.')
+      process.exit(0)
+    }
+
+    const superadminAccount = await db.table('users')
+      .where('username', config.superadminAccount)
+      .select('permission')
       .first()
-      .update({
-        permission: perms.permissions.superadmin
-      })
-      .then(result => {
-        // NOTE: permissionController.js actually has a hard-coded check for "root" account so that
-        // it will always have "superadmin" permission regardless of its permission value in database
-        console.log(`Updated root's permission to ${perms.permissions.superadmin} (superadmin).`)
-        done++
-      })
+
+    if (!superadminAccount) {
+      console.log(`Superadmin account "${config.superadminAccount}" is not found in database.`)
+      process.exit(0)
+    }
+
+    if (superadminAccount.permission !== perms.permissions.superadmin) {
+      await db.table('users')
+        .where('username', config.superadminAccount)
+        .first()
+        .update({
+          permission: perms.permissions.superadmin
+        })
+        .then(result => {
+          console.log(`Updated "${config.superadminAccount}"'s permission to ${perms.permissions.superadmin} (superadmin).`)
+          done++
+        })
+    }
   }
 
   const filesOutdatedSize = await db.table('files')

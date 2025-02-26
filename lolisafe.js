@@ -9,6 +9,11 @@ process.on('unhandledRejection', error => {
   logger.error(error, { prefix: 'Unhandled Rejection (Promise): ' })
 })
 
+process.once('SIGINT', () => {
+  logger.log('SIGINT signal received, exiting lolisafe\u2026')
+  process.exit(0)
+})
+
 // Change working directory into the directory that contains lolisafe.js
 try {
   const { chdir, cwd } = require('process')
@@ -425,8 +430,6 @@ safe.use('/api', api)
         } catch (error) {
           process.stderr.write(`${error.stack}\n`)
         }
-      }).on('SIGINT', () => {
-        process.exit(0)
       })
       logger.log(utils.stripIndents(`!!! DEVELOPMENT MODE !!!
         [=] Nunjucks will auto rebuild (not live reload)

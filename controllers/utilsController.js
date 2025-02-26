@@ -252,6 +252,11 @@ self.mayGenerateThumb = extname => {
     (config.uploads.generateThumbs.video && Constants.VIDEO_EXTS.includes(extname))
 }
 
+self.isAnimatedThumb = extname => {
+  extname = extname.toLowerCase()
+  return (config.uploads.generateThumbs.animated && Constants.ANIMATED_EXTS.includes(extname))
+}
+
 // Expand if necessary (should be case-insensitive)
 const extPreserves = [
   /\.tar\.\w+/i // tarballs
@@ -288,56 +293,30 @@ self.extname = (filename, lower) => {
   return lower ? str.toLowerCase() : str
 }
 
+const escapeMap = {
+  '&': '&amp;',
+  '"': '&quot;',
+  '\'': '&#39;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '\\': '&#92;'
+}
+
+const escapeRegex = /[&"'<>\\]/g
+
+const unescapeMap = Object.keys(escapeMap).reduce((ret, key) => {
+  ret[escapeMap[key]] = key
+  return ret
+}, {})
+
+const unescapeRegex = /&(amp|quot|#39|lt|gt|#92);/g
+
 self.escape = string => {
-  // MIT License
-  // Copyright(c) 2012-2013 TJ Holowaychuk
-  // Copyright(c) 2015 Andreas Lubbe
-  // Copyright(c) 2015 Tiancheng "Timothy" Gu
+  return string.replace(escapeRegex, key => escapeMap[key])
+}
 
-  if (!string) return string
-
-  const str = String(string)
-  const match = /["'&<>]/.exec(str)
-
-  if (!match) return str
-
-  let escape
-  let html = ''
-  let index = 0
-  let lastIndex = 0
-
-  for (index = match.index; index < str.length; index++) {
-    switch (str.charCodeAt(index)) {
-      case 34: // "
-        escape = '&quot;'
-        break
-      case 38: // &
-        escape = '&amp;'
-        break
-      case 39: // '
-        escape = '&#39;'
-        break
-      case 60: // <
-        escape = '&lt;'
-        break
-      case 62: // >
-        escape = '&gt;'
-        break
-      default:
-        continue
-    }
-
-    if (lastIndex !== index) {
-      html += str.substring(lastIndex, index)
-    }
-
-    lastIndex = index + 1
-    html += escape
-  }
-
-  return lastIndex !== index
-    ? html + str.substring(lastIndex, index)
-    : html
+self.unescape = string => {
+  return string.replace(unescapeRegex, key => unescapeMap[key])
 }
 
 self.stripIndents = string => {
@@ -363,6 +342,12 @@ self.mask = string => {
       '*'.repeat(Math.min(string.length - (fragment * 2), 4)) +
       string.substring(string.length - fragment)
   }
+}
+
+self.pathSafeIp = ip => {
+  // Mainly intended for IPv6 addresses
+  if (!ip) return ''
+  return ip.replace(/:/g, '-')
 }
 
 self.filterUniquifySqlArray = (value, index, array) => {
@@ -394,15 +379,28 @@ self.assertJSON = async (req, res) => {
 
 self.generateThumbs = async (name, extname, force) => {
   extname = extname.toLowerCase()
-  const thumbname = path.join(paths.thumbs, name.slice(0, -extname.length) + '.png')
+  const thumbname = name.slice(0, -extname.length)
+  let thumbext = '.png'
+  if (self.isAnimatedThumb(extname)) thumbext = '.gif'
+
+  const thumbfile = path.join(paths.thumbs, thumbname + thumbext)
 
   try {
+    // Check if old static thumbnail exists, then unlink it
+    if (thumbext === '.gif') {
+      const staticthumb = path.join(paths.thumbs, thumbname + '.png')
+      const stat = await jetpack.inspectAsync(staticthumb)
+      if (stat) {
+        await jetpack.removeAsync(staticthumb)
+      }
+    }
+
     // Check if thumbnail already exists
-    const stat = await jetpack.inspectAsync(thumbname)
+    const stat = await jetpack.inspectAsync(thumbfile)
     if (stat) {
       if (stat.type === 'symlink') {
         // Unlink if symlink (should be symlink to the placeholder)
-        await jetpack.removeAsync(thumbname)
+        await jetpack.removeAsync(thumbfile)
       } else if (!force) {
         // Continue only if it does not exist, unless forced to
         return true
@@ -414,6 +412,11 @@ self.generateThumbs = async (name, extname, force) => {
 
     // If image extension
     if (Constants.IMAGE_EXTS.includes(extname)) {
+      const sharpOptions = {}
+      if (thumbext === '.gif') {
+        sharpOptions.animated = true
+      }
+
       const resizeOptions = {
         width: self.thumbsSize,
         height: self.thumbsSize,
@@ -425,15 +428,17 @@ self.generateThumbs = async (name, extname, force) => {
           alpha: 0
         }
       }
-      const image = sharp(input)
+
+      const image = sharp(input, sharpOptions)
+
       const metadata = await image.metadata()
       if (metadata.width > resizeOptions.width || metadata.height > resizeOptions.height) {
         await image
           .resize(resizeOptions)
-          .toFile(thumbname)
+          .toFile(thumbfile)
       } else if (metadata.width === resizeOptions.width && metadata.height === resizeOptions.height) {
         await image
-          .toFile(thumbname)
+          .toFile(thumbfile)
       } else {
         const x = resizeOptions.width - metadata.width
         const y = resizeOptions.height - metadata.height
@@ -445,7 +450,7 @@ self.generateThumbs = async (name, extname, force) => {
             right: Math.ceil(x / 2),
             background: resizeOptions.background
           })
-          .toFile(thumbname)
+          .toFile(thumbfile)
       }
     } else if (Constants.VIDEO_EXTS.includes(extname)) {
       const metadata = await self.ffprobe(input)
@@ -481,7 +486,7 @@ self.generateThumbs = async (name, extname, force) => {
           // Sometimes FFMPEG would throw errors but actually somehow succeeded in making the thumbnails
           // (this could be a fallback mechanism of fluent-ffmpeg library instead)
           // So instead we check if the thumbnail exists to really make sure
-          if (await jetpack.existsAsync(thumbname)) {
+          if (await jetpack.existsAsync(thumbfile)) {
             return true
           } else {
             throw error || new Error('FFMPEG exited with empty output file')
@@ -492,9 +497,9 @@ self.generateThumbs = async (name, extname, force) => {
     }
   } catch (error) {
     logger.error(`[${name}]: generateThumbs(): ${error.toString().trim()}`)
-    await jetpack.removeAsync(thumbname) // try to unlink incomplete thumbs first
+    await jetpack.removeAsync(thumbfile) // try to unlink incomplete thumbs first
     try {
-      await jetpack.symlinkAsync(paths.thumbPlaceholder, thumbname)
+      await jetpack.symlinkAsync(paths.thumbPlaceholder, thumbfile)
       return true
     } catch (err) {
       logger.error(`[${name}]: generateThumbs(): ${err.toString().trim()}`)
@@ -568,10 +573,11 @@ self.unlinkFile = async filename => {
   }
 }
 
-self.bulkDeleteFromDb = async (field, values, user) => {
-  // Always return an empty array on failure
-  if (!user || !['id', 'name'].includes(field) || !values.length) {
-    return []
+self.bulkDeleteFromDb = async (field, values = [], user, permissionBypass = false) => {
+  // NOTE: permissionBypass should not be set unless used by lolisafe's automated service.
+
+  if ((!user && !permissionBypass) || !['id', 'name'].includes(field) || !values.length) {
+    return values
   }
 
   // SQLITE_LIMIT_VARIABLE_NUMBER, which defaults to 999
@@ -583,7 +589,7 @@ self.bulkDeleteFromDb = async (field, values, user) => {
   }
 
   const failed = []
-  const ismoderator = perms.is(user, 'moderator')
+  const ismoderator = permissionBypass || perms.is(user, 'moderator')
 
   try {
     const unlinkeds = []
@@ -718,7 +724,6 @@ self.bulkDeleteExpired = async (dryrun, verbose) => {
   const timestamp = Date.now() / 1000
   const fields = ['id']
   if (verbose) fields.push('name')
-  const sudo = { username: 'root' }
 
   const result = {}
   result.expired = await self.db.table('files')
@@ -729,7 +734,8 @@ self.bulkDeleteExpired = async (dryrun, verbose) => {
     // Make a shallow copy
     const field = fields[0]
     const values = result.expired.slice().map(row => row[field])
-    result.failed = await self.bulkDeleteFromDb(field, values, sudo)
+    // NOTE: 4th parameter set to true to bypass permission check
+    result.failed = await self.bulkDeleteFromDb(field, values, null, true)
     if (verbose && result.failed.length) {
       result.failed = result.failed
         .map(failed => result.expired.find(file => file[fields[0]] === failed))

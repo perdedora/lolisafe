@@ -372,7 +372,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
     const isChunk = typeof req.body.uuid === 'string' && Boolean(req.body.uuid)
     if (isChunk) {
       // Re-map UUID property to IP-specific UUID
-      const uuid = `${req.ip}_${req.body.uuid}`
+      const uuid = `${utils.pathSafeIp(req.ip)}_${req.body.uuid}`
       // Calling initChunks() will also reset the chunked uploads' timeout
       file.chunksData = await initChunks(uuid)
       file.filename = file.chunksData.filename
@@ -411,7 +411,7 @@ self.actuallyUpload = async (req, res, data = {}) => {
         hashStream.once('error', _reject)
 
         // Ensure readStream will only be resumed later down the line by readStream.pipe()
-        readStream.pause()
+        // TODO: readStream.pause()
         readStream.on('data', data => {
           // .dispose() will destroy this internal component,
           // so use it as an indicator of whether the hashStream has been .dispose()'d
@@ -759,7 +759,7 @@ self.finishChunks = async (req, res) => {
 
   // Re-map UUID property to IP-specific UUID
   files.forEach(file => {
-    file.uuid = `${req.ip}_${file.uuid}`
+    file.uuid = `${utils.pathSafeIp(req.ip)}_${file.uuid}`
     file.chunksData = chunksData[file.uuid]
   })
 
@@ -1809,7 +1809,9 @@ self.list = async (req, res) => {
   for (const file of result.files) {
     file.extname = utils.extname(file.name)
     if (utils.mayGenerateThumb(file.extname)) {
-      file.thumb = `thumbs/${file.name.slice(0, -file.extname.length)}.png`
+      let thumbext = '.png'
+      if (utils.isAnimatedThumb(file.extname)) thumbext = '.gif'
+      file.thumb = `thumbs/${file.name.slice(0, -file.extname.length)}${thumbext}`
     }
   }
 
@@ -1840,12 +1842,6 @@ self.list = async (req, res) => {
         }
         return obj
       })
-
-    // If filtering by album IDs,
-    // then filter out uploads with missing albums data (assume disabled/deleted)
-    if (filterByAlbums) {
-      result.files = result.files.filter(file => result.albums[file.albumid] !== undefined)
-    }
   }
 
   // If we are not listing all uploads, send response

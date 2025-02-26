@@ -54,7 +54,8 @@ class NunjucksRenderer {
         resolve(html)
       })
     }).then(html => {
-      res.type('html').send(html)
+      res.header('Content-Type', 'text/html; charset=utf-8')
+      res.send(html)
       return html
     })
   }

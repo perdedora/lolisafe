@@ -168,9 +168,9 @@ self.register = async (req, res) => {
     throw new ClientError(`Username must have ${self.user.min}-${self.user.max} characters.`)
   }
 
-  // Please be advised that root user is hard-coded to always have superadmin permission
-  // However, you may choose to delete the root user via direct database query,
-  // so it is also hard-coded to always prevent it from being re-created via the API
+  // "root" user is not required if you have other users with superadmin permission,
+  // so removing them via direct database query is possible.
+  // However, protect it from being re-created via the API endpoints anyway.
   if (username === 'root') {
     throw new ClientError('Username is reserved.')
   }
@@ -236,9 +236,7 @@ self.changePassword = async (req, res) => {
 }
 
 self.assertPermission = (user, target) => {
-  if (target.username === 'root') {
-    throw new ClientError('User "root" may not be tampered with.', { statusCode: 403 })
-  } else if (!perms.higher(user, target)) {
+  if (!perms.higher(user, target)) {
     throw new ClientError('The user is in the same or higher group as you.', { statusCode: 403 })
   }
 }
@@ -256,6 +254,7 @@ self.createUser = async (req, res) => {
     throw new ClientError(`Username must have ${self.user.min}-${self.user.max} characters.`)
   }
 
+  // Please consult notes in self.register() function.
   if (username === 'root') {
     throw new ClientError('Username is reserved.')
   }
